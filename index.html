@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>鍵盤ハーモニカ (32鍵)</title>
+    <title>3D リアル鍵盤ハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -173,19 +173,18 @@
             <!-- Controls Panel -->
             <div class="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm">
                 
-                <!-- Display Mode (ドレミ / CDE) -->
+                <!-- Display Mode (なし / ドレミ) -->
                 <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-tag mr-1 text-sky-400"></i>音名:</span>
-                    <button id="btn-label-doremi" onclick="setLabelMode('doremi')" class="px-2 py-1 rounded font-bold bg-sky-500 text-white shadow">ドレミ</button>
-                    <button id="btn-label-cde" onclick="setLabelMode('cde')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">CDE</button>
-                    <button id="btn-label-none" onclick="setLabelMode('none')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">なし</button>
+                    <button id="btn-label-none" onclick="setLabelMode('none')" class="px-2 py-1 rounded font-bold bg-sky-500 text-white shadow">なし</button>
+                    <button id="btn-label-doremi" onclick="setLabelMode('doremi')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">ドレミ</button>
                 </div>
 
                 <!-- Scale Mode (Real Proportion vs 1:1 Physical mm) -->
                 <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-ruler-horizontal mr-1 text-emerald-400"></i>サイズ:</span>
-                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">画面フィット (実寸比率)</button>
-                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">実物大 1:1 mm</button>
+                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">画面フィット (実寸比率)</button>
+                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">実物大 1:1 mm</button>
                 </div>
 
                 <!-- Color Theme Selector -->
@@ -458,8 +457,8 @@
             't': 77, '6': 78, 'y': 79, '7': 80, 'u': 81, '8': 82, 'i': 83, 'o': 84
         };
 
-        let labelMode = 'doremi';
-        let isRealMmScale = false;
+        let labelMode = 'none';
+        let isRealMmScale = true; // デフォルトで実物大モード
         let currentSong = null;
         let songStep = 0;
         let autoPlayTimer = null;
@@ -506,15 +505,15 @@
             const totalWhiteKeys = whiteKeys.length; // 19
 
             if (isRealMmScale) {
-                // Real 1:1 Physical Millimeter Scale (21mm x 89.5mm per key)
-                wrapper.className = 'w-full relative overflow-x-auto flex items-end';
-                container.style.width = `${19 * 21}mm`;
-                container.style.height = `94mm`;
+                // Chromebook画面上で実寸19mmになるようスケール調整
+                wrapper.className = 'w-full relative overflow-x-auto flex items-end pb-1';
+                container.style.width = `${19 * 26.6}mm`;
+                container.style.height = `118mm`;
                 
-                const whiteKeyWidthMm = 21;
-                const whiteKeyHeightMm = 89.5;
-                const blackKeyWidthMm = 11;
-                const blackKeyHeightMm = 53;
+                const whiteKeyWidthMm = 26.6;  // 実測約19mm表示
+                const whiteKeyHeightMm = 113.0; // 白鍵長さ
+                const blackKeyWidthMm = 13.9;   // 黒鍵幅（実測約10mm表示）
+                const blackKeyHeightMm = 66.7;  // 黒鍵長さ
 
                 whiteKeys.forEach(key => {
                     const keyEl = document.createElement('div');
@@ -549,6 +548,14 @@
                     keyEl.appendChild(label);
 
                     container.appendChild(keyEl);
+                });
+
+                // 初期スクロール位置を白鍵2つ分左へ移動
+                requestAnimationFrame(() => {
+                    const key2El = document.getElementById('key-57'); // whitePos 2 (A3)
+                    if (key2El) {
+                        wrapper.scrollLeft = key2El.offsetLeft;
+                    }
                 });
 
             } else {
@@ -651,7 +658,6 @@
 
         function getLabelText(key) {
             if (labelMode === 'doremi') return key.doremi;
-            if (labelMode === 'cde') return key.cde;
             return '';
         }
 
@@ -700,9 +706,8 @@
            ------------------------------------------------------------- */
         function setLabelMode(mode) {
             labelMode = mode;
-            document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
-            document.getElementById('btn-label-cde').className = mode === 'cde' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
             document.getElementById('btn-label-none').className = mode === 'none' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
 
             renderKeyboard();
             highlightCurrentSongGuide();

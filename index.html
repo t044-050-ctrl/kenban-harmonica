@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <title>3D リアル鍵盤ハーモニカ (32鍵)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        /* Disable text selection, callout menus, and long-press effects globally */
+        *, *::before, *::after {
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            -khtml-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            touch-action: none;
+            overflow: hidden;
+            background-color: #020617;
+        }
+
+        /* 16:9 Aspect Ratio Main Container */
+        .app-16-9-container {
+            aspect-ratio: 16 / 9;
+            width: 100vw;
+            height: 56.25vw; /* 100 * 9 / 16 */
+            max-height: 100vh;
+            max-width: 177.78vh; /* 100 * 16 / 9 */
+            margin: auto;
+        }
+
+        /* Pianica Main Shell 3D styling */
+        .pianica-body {
+            box-shadow: 
+                0 20px 30px rgba(0,0,0,0.4),
+                inset 0 2px 4px rgba(255,255,255,0.6);
+            transition: background-color 0.3s ease;
+        }
+
+        /* Keyboard bed indentation */
+        .keyboard-bed {
+            box-shadow: 
+                inset 0 6px 12px rgba(0, 0, 0, 0.6);
+        }
+
+        /* 3D White Key */
+        .white-key {
+            background: linear-gradient(to bottom, #ffffff 0%, #f3f3f3 75%, #e0e0e0 100%);
+            border-radius: 0 0 8px 8px;
+            box-shadow: 
+                -1px 0 2px rgba(0,0,0,0.1),
+                1px 0 2px rgba(0,0,0,0.1),
+                0 4px 0 #b5b5b5,
+                0 8px 10px rgba(0,0,0,0.3);
+            transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.05s ease;
+            transform-origin: top center;
+        }
+
+        .white-key:active, .white-key.active {
+            background: linear-gradient(to bottom, #eeeeee 0%, #e0e0e0 75%, #d5d5d5 100%);
+            transform: perspective(500px) rotateX(-2deg) translateY(4px);
+            box-shadow: 
+                -1px 0 1px rgba(0,0,0,0.1),
+                1px 0 1px rgba(0,0,0,0.1),
+                0 1px 0 #999999,
+                0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* Highlighted for melody guide */
+        .white-key.guide-active {
+            background: linear-gradient(to bottom, #fff9c4 0%, #fff176 75%, #fbc02d 100%) !important;
+            box-shadow: 0 0 15px #fbc02d, 0 6px 0 #c79a00 !important;
+        }
+
+        /* 3D Black Key */
+        .black-key {
+            background: linear-gradient(to bottom, #333333 0%, #111111 70%, #222222 100%);
+            border-radius: 0 0 4px 4px;
+            box-shadow: 
+                -2px 0 4px rgba(0,0,0,0.4),
+                2px 0 4px rgba(0,0,0,0.4),
+                0 5px 0 #000000,
+                0 8px 10px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.05s ease;
+            transform-origin: top center;
+            z-index: 20;
+        }
+
+        .black-key:active, .black-key.active {
+            background: linear-gradient(to bottom, #222222 0%, #050505 100%);
+            transform: perspective(500px) rotateX(-2deg) translateY(3px);
+            box-shadow: 
+                -1px 0 2px rgba(0,0,0,0.4),
+                1px 0 2px rgba(0,0,0,0.4),
+                0 2px 0 #000000,
+                0 3px 5px rgba(0,0,0,0.4);
+        }
+
+        .black-key.guide-active {
+            background: linear-gradient(to bottom, #ff9800 0%, #f57c00 100%) !important;
+            box-shadow: 0 0 15px #ff9800, 0 4px 0 #e65100 !important;
+        }
+
+        /* Hose / Blow Pipe Simulation */
+        .blow-pipe {
+            background: repeating-linear-gradient(
+                90deg,
+                #e8e8e8,
+                #e8e8e8 6px,
+                #cccccc 6px,
+                #cccccc 12px
+            );
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Custom scrollbar for key bed */
+        .keyboard-scroll-container::-webkit-scrollbar {
+            height: 10px;
+        }
+        .keyboard-scroll-container::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+        .keyboard-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.4);
+            border-radius: 5px;
+        }
+
+        /* Note bubble particle effect */
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-60px) scale(1.4); }
+        }
+        .note-particle {
+            position: absolute;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+            font-weight: bold;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 w-screen h-screen flex items-center justify-center overflow-hidden">
+
+    <!-- 16:9 CONTAINER WRAPPER -->
+    <div class="app-16-9-container bg-slate-900 flex flex-col justify-between overflow-hidden shadow-2xl relative border border-slate-800">
+
+    <!-- TOP CONTROL BAR -->
+    <header class="bg-slate-800 border-b border-slate-700 p-3 shadow-md z-30">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            
+            <!-- Title -->
+            <div class="flex items-center gap-3">
+                <div class="bg-sky-500 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg font-bold text-xl">
+                    <i class="fa-solid font-bold">32</i>
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-black text-sky-400 leading-tight">リアル鍵盤ハーモニカ</h1>
+                    <p class="text-xs text-slate-400">学校用アルト32鍵 (F3〜C6) | PC操作: [Z]〜[M] / [Q]〜[U]</p>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <div class="flex flex-wrap items-center gap-2 md:gap-4 text-xs md:text-sm">
+                
+                <!-- Display Mode (ドレミ / CDE) -->
+                <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
+                    <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-tag mr-1 text-sky-400"></i>音名:</span>
+                    <button id="btn-label-doremi" onclick="setLabelMode('doremi')" class="px-2 py-1 rounded font-bold bg-sky-500 text-white shadow">ドレミ</button>
+                    <button id="btn-label-cde" onclick="setLabelMode('cde')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">CDE</button>
+                    <button id="btn-label-none" onclick="setLabelMode('none')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">なし</button>
+                </div>
+
+                <!-- Scale Mode (Real Proportion vs 1:1 Physical mm) -->
+                <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
+                    <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-ruler-horizontal mr-1 text-emerald-400"></i>サイズ:</span>
+                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">画面フィット (実寸比率)</button>
+                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">実物大 1:1 mm</button>
+                </div>
+
+                <!-- Color Theme Selector -->
+                <div class="flex items-center gap-1.5 bg-slate-700/80 rounded-lg p-1.5 border border-slate-600">
+                    <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-palette mr-1 text-pink-400"></i>本体色:</span>
+                    <button onclick="setBodyColor('sky')" class="w-6 h-6 rounded-full bg-sky-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
+                    <button onclick="setBodyColor('pink')" class="w-6 h-6 rounded-full bg-pink-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
+                    <button onclick="setBodyColor('yellow')" class="w-6 h-6 rounded-full bg-amber-300 border-2 border-white shadow hover:scale-110 transition-transform"></button>
+                    <button onclick="setBodyColor('green')" class="w-6 h-6 rounded-full bg-emerald-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <!-- LESSON & SONG GUIDE SECTION -->
+    <section class="bg-slate-800/60 border-b border-slate-700/50 py-2 px-4">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-music text-amber-400 text-lg"></i>
+                <span class="font-bold text-sm text-slate-200">練習曲メロディガイド:</span>
+                <select id="song-select" onchange="loadSelectedSong()" class="bg-slate-700 text-white rounded-lg px-3 py-1 font-bold text-xs md:text-sm border border-slate-600 focus:outline-none focus:border-amber-400">
+                    <option value="">曲を選択してください...</option>
+                    <option value="kaeru">かえるの合唱</option>
+                    <option value="tulip">チューリップ</option>
+                    <option value="twinkle">きらきら星</option>
+                    <option value="joy">かんきのおうた (ベートーヴェン)</option>
+                    <option value="doremi">ドレミのうた</option>
+                    <option value="mary">メリーさんのひつじ</option>
+                    <option value="yamano">やまの おんがくか</option>
+                    <option value="mickey">ミッキーマウスマーチ</option>
+                </select>
+            </div>
+
+            <!-- Song Controls & Step Indicator -->
+            <div class="flex items-center gap-3">
+                <div id="guide-info" class="text-xs font-bold text-amber-300 bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/30 min-w-[150px] text-center">
+                    曲を選んで練習しよう
+                </div>
+                <button id="btn-prev-step" onclick="prevSongStep()" disabled class="bg-slate-700 disabled:opacity-40 text-white px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-600">
+                    <i class="fa-solid fa-backward"></i> 前へ
+                </button>
+                <button id="btn-next-step" onclick="nextSongStep()" disabled class="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 px-3 py-1 rounded-lg text-xs font-black shadow">
+                    次へ <i class="fa-solid fa-forward"></i>
+                </button>
+                <button id="btn-auto-play" onclick="toggleAutoPlay()" disabled class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-3 py-1 rounded-lg text-xs font-bold shadow flex items-center gap-1">
+                    <i id="icon-auto-play" class="fa-solid fa-play"></i> 自動お手本
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- MAIN INSTRUMENT VISUAL CONTAINER -->
+    <main class="flex-1 flex flex-col items-center justify-end p-0 overflow-hidden relative">
+
+        <!-- PIANICA REAL BODY CONTAINER (FLUSH TO BOTTOM EDGE) -->
+        <div id="pianica-shell" class="pianica-body bg-sky-400 rounded-t-3xl rounded-b-none pt-2 px-2 pb-0 w-full h-auto max-w-full flex flex-col justify-end transition-all shadow-2xl">
+            
+            <!-- Left Side Hose Outlet & Brand Logo -->
+            <div class="flex items-center justify-between mb-1.5 px-2">
+                <div class="flex items-center gap-3">
+                    <!-- Flexible Hose Mouthpiece Simulation -->
+                    <div class="flex items-center">
+                        <div class="w-6 h-6 rounded-full bg-slate-200 border-2 border-slate-400 flex items-center justify-center shadow-inner">
+                            <div class="w-2.5 h-2.5 rounded-full bg-slate-800"></div>
+                        </div>
+                        <div class="blow-pipe h-3.5 w-12 rounded-r-md border-y border-r border-slate-400 -ml-1"></div>
+                    </div>
+                    <span class="font-black tracking-widest text-white/90 text-sm md:text-base drop-shadow">PIANICA 32</span>
+                </div>
+
+                <div class="text-xs font-bold text-white/80 bg-black/20 px-3 py-0.5 rounded-full border border-white/20">
+                    鍵盤音域: F3 ～ C6 (全19白鍵・32鍵)
+                </div>
+            </div>
+
+            <!-- KEYBED INNER SHADOW HOUSING (FLUSH TO BOTTOM) -->
+            <div class="keyboard-bed bg-slate-900 pt-1 px-1 pb-0 rounded-t-xl rounded-b-none border-t-2 border-x-2 border-slate-800/80 relative overflow-hidden flex flex-col justify-end">
+                
+                <!-- Full Width Key Area -->
+                <div id="keyboard-wrapper" class="w-full relative overflow-hidden flex flex-col justify-end">
+                    
+                    <!-- DYNAMIC 32 KEYBOARD BOARD -->
+                    <div id="keyboard-container" class="w-full relative select-none">
+                        <!-- Keys will be dynamically rendered via JS -->
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    </div> <!-- END 16:9 CONTAINER WRAPPER -->
+
+    <!-- JAVASCRIPT APP LOGIC -->
+    <script>
+        /* -------------------------------------------------------------
+           WEB AUDIO API SYNTHESIZER FOR MELODICA (REED SOUND)
+           ------------------------------------------------------------- */
+        class MelodicaAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.activeNotes = new Map(); // midi -> { osc1, osc2, gain, filter }
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            midiToFreq(midi) {
+                return 440 * Math.pow(2, (midi - 69) / 12);
+            }
+
+            startNote(midi) {
+                this.init();
+                if (this.activeNotes.has(midi)) return;
+
+                const freq = this.midiToFreq(midi);
+                const now = this.ctx.currentTime;
+
+                // Reed timbre synthesis: saw + square wave detune
+                const osc1 = this.ctx.createOscillator();
+                osc1.type = 'sawtooth';
+                osc1.frequency.setValueAtTime(freq, now);
+
+                const osc2 = this.ctx.createOscillator();
+                osc2.type = 'square';
+                osc2.frequency.setValueAtTime(freq * 1.002, now);
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(freq * 3.5, now);
+                filter.Q.setValueAtTime(1.5, now);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+
+                osc1.connect(filter);
+                osc2.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+
+                this.activeNotes.set(midi, { osc1, osc2, gain, filter });
+            }
+
+            stopNote(midi) {
+                if (!this.ctx || !this.activeNotes.has(midi)) return;
+
+                const note = this.activeNotes.get(midi);
+                const now = this.ctx.currentTime;
+
+                note.gain.gain.cancelScheduledValues(now);
+                note.gain.gain.setValueAtTime(note.gain.gain.value, now);
+                note.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+
+                setTimeout(() => {
+                    try {
+                        note.osc1.stop();
+                        note.osc2.stop();
+                        note.osc1.disconnect();
+                        note.osc2.disconnect();
+                        note.gain.disconnect();
+                    } catch (e) {}
+                }, 50);
+
+                this.activeNotes.delete(midi);
+            }
+        }
+
+        const audioEngine = new MelodicaAudioEngine();
+
+        // 最初の画面タップ/操作イベントのキャプチャ段階で音声エンジンを即時起動（1回目から鳴るように修正）
+        const unlockAudioContext = () => {
+            audioEngine.init();
+        };
+        window.addEventListener('pointerdown', unlockAudioContext, { capture: true });
+        window.addEventListener('touchstart', unlockAudioContext, { capture: true });
+        window.addEventListener('mousedown', unlockAudioContext, { capture: true });
+        window.addEventListener('keydown', unlockAudioContext, { capture: true });
+
+        /* -------------------------------------------------------------
+           CONSTANTS & DATA STRUCTURES
+           ------------------------------------------------------------- */
+        const KEYS_CONFIG = [
+            { midi: 53, isBlack: false, whitePos: 0, doremi: "ファ", cde: "F3" },
+            { midi: 54, isBlack: true,  whitePos: 0, doremi: "ファ#", cde: "F#3" },
+            { midi: 55, isBlack: false, whitePos: 1, doremi: "ソ", cde: "G3" },
+            { midi: 56, isBlack: true,  whitePos: 1, doremi: "ソ#", cde: "G#3" },
+            { midi: 57, isBlack: false, whitePos: 2, doremi: "ラ", cde: "A3" },
+            { midi: 58, isBlack: true,  whitePos: 2, doremi: "ラ#", cde: "A#3" },
+            { midi: 59, isBlack: false, whitePos: 3, doremi: "シ", cde: "B3" },
+            { midi: 60, isBlack: false, whitePos: 4, doremi: "ド", cde: "C4" },
+            { midi: 61, isBlack: true,  whitePos: 4, doremi: "ド#", cde: "C#4" },
+            { midi: 62, isBlack: false, whitePos: 5, doremi: "レ", cde: "D4" },
+            { midi: 63, isBlack: true,  whitePos: 5, doremi: "レ#", cde: "D#4" },
+            { midi: 64, isBlack: false, whitePos: 6, doremi: "ミ", cde: "E4" },
+            { midi: 65, isBlack: false, whitePos: 7, doremi: "ファ", cde: "F4" },
+            { midi: 66, isBlack: true,  whitePos: 7, doremi: "ファ#", cde: "F#4" },
+            { midi: 67, isBlack: false, whitePos: 8, doremi: "ソ", cde: "G4" },
+            { midi: 68, isBlack: true,  whitePos: 8, doremi: "ソ#", cde: "G#4" },
+            { midi: 69, isBlack: false, whitePos: 9, doremi: "ラ", cde: "A4" },
+            { midi: 70, isBlack: true,  whitePos: 9, doremi: "ラ#", cde: "A#4" },
+            { midi: 71, isBlack: false, whitePos: 10, doremi: "シ", cde: "B4" },
+            { midi: 72, isBlack: false, whitePos: 11, doremi: "ド", cde: "C5" },
+            { midi: 73, isBlack: true,  whitePos: 11, doremi: "ド#", cde: "C#5" },
+            { midi: 74, isBlack: false, whitePos: 12, doremi: "レ", cde: "D5" },
+            { midi: 75, isBlack: true,  whitePos: 12, doremi: "レ#", cde: "D#5" },
+            { midi: 76, isBlack: false, whitePos: 13, doremi: "ミ", cde: "E5" },
+            { midi: 77, isBlack: false, whitePos: 14, doremi: "ファ", cde: "F5" },
+            { midi: 78, isBlack: true,  whitePos: 14, doremi: "ファ#", cde: "F#5" },
+            { midi: 79, isBlack: false, whitePos: 15, doremi: "ソ", cde: "G5" },
+            { midi: 80, isBlack: true,  whitePos: 15, doremi: "ソ#", cde: "G#5" },
+            { midi: 81, isBlack: false, whitePos: 16, doremi: "ラ", cde: "A5" },
+            { midi: 82, isBlack: true,  whitePos: 16, doremi: "ラ#", cde: "A#5" },
+            { midi: 83, isBlack: false, whitePos: 17, doremi: "シ", cde: "B5" },
+            { midi: 84, isBlack: false, whitePos: 18, doremi: "ド", cde: "C6" }
+        ];
+
+        const SONGS = {
+            kaeru: {
+                title: "かえるの合唱",
+                notes: [60, 62, 64, 65, 64, 62, 60, 64, 65, 67, 69, 67, 65, 64, 60, 60, 60, 60, 60, 60, 60, 60, 62, 62, 64, 64, 65, 64, 62, 60]
+            },
+            tulip: {
+                title: "チューリップ",
+                notes: [60, 62, 64, 60, 62, 64, 67, 64, 62, 60, 62, 64, 62]
+            },
+            twinkle: {
+                title: "きらきら星",
+                notes: [60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60]
+            },
+            joy: {
+                title: "かんきのおうた",
+                notes: [64, 64, 65, 67, 67, 65, 64, 62, 60, 60, 62, 64, 64, 62, 62]
+            },
+            doremi: {
+                title: "ドレミのうた",
+                notes: [60, 62, 64, 60, 64, 60, 64, 62, 64, 65, 65, 64, 62, 65]
+            },
+            mary: {
+                title: "メリーさんのひつじ",
+                notes: [64, 62, 60, 62, 64, 64, 64, 62, 62, 62, 64, 67, 67, 64, 62, 60, 62, 64, 64, 64, 64, 62, 62, 64, 62, 60]
+            },
+            yamano: {
+                title: "やまの おんがくか",
+                notes: [60, 62, 64, 65, 67, 67, 67, 69, 67, 65, 64, 62, 60, 64, 67, 60, 64, 67]
+            },
+            mickey: {
+                title: "ミッキーマウスマーチ",
+                notes: [60, 60, 60, 60, 62, 64, 65, 67, 67, 67, 69, 69, 69, 67, 65, 64, 62, 60, 67, 64, 60, 62, 64, 65, 67, 67, 67, 69, 67, 65, 64, 62, 60]
+            }
+        };
+
+        const PC_KEY_MAP = {
+            'z': 53, 's': 54, 'x': 55, 'd': 56, 'c': 57, 'f': 58, 'v': 59,
+            'b': 60, 'h': 61, 'n': 62, 'j': 63, 'm': 64, ',': 65, 'l': 66,
+            '.': 67, ';': 68, '/': 69,
+            'q': 70, '2': 71, 'w': 72, '3': 73, 'e': 74, '4': 75, 'r': 76,
+            't': 77, '6': 78, 'y': 79, '7': 80, 'u': 81, '8': 82, 'i': 83, 'o': 84
+        };
+
+        let labelMode = 'doremi';
+        let isRealMmScale = false;
+        let currentSong = null;
+        let songStep = 0;
+        let autoPlayTimer = null;
+
+        const activePointerMidis = new Map();
+        const pcPressedMidis = new Set();
+        const activePressedMidis = new Set();
+
+        /* -------------------------------------------------------------
+           TOUCH / POINTER STATE SYNC
+           ------------------------------------------------------------- */
+        function syncKeyStates() {
+            const targetMidis = new Set([...activePointerMidis.values(), ...pcPressedMidis]);
+
+            for (const midi of Array.from(activePressedMidis)) {
+                if (!targetMidis.has(midi)) {
+                    releaseKey(midi);
+                }
+            }
+
+            targetMidis.forEach(midi => {
+                if (!activePressedMidis.has(midi)) {
+                    pressKey(midi);
+                }
+            });
+        }
+
+        function stopAllNotes() {
+            activePointerMidis.clear();
+            pcPressedMidis.clear();
+            syncKeyStates();
+        }
+
+        /* -------------------------------------------------------------
+           UI DOM GENERATION & REAL DIMENSION RENDERING
+           ------------------------------------------------------------- */
+        function renderKeyboard() {
+            const container = document.getElementById('keyboard-container');
+            const wrapper = document.getElementById('keyboard-wrapper');
+            if (!container || !wrapper) return;
+            container.innerHTML = '';
+
+            const whiteKeys = KEYS_CONFIG.filter(k => !k.isBlack);
+            const totalWhiteKeys = whiteKeys.length; // 19
+
+            if (isRealMmScale) {
+                // Real 1:1 Physical Millimeter Scale (21mm x 89.5mm per key)
+                wrapper.className = 'w-full relative overflow-x-auto flex items-end';
+                container.style.width = `${19 * 21}mm`;
+                container.style.height = `94mm`;
+                
+                const whiteKeyWidthMm = 21;
+                const whiteKeyHeightMm = 89.5;
+                const blackKeyWidthMm = 11;
+                const blackKeyHeightMm = 53;
+
+                whiteKeys.forEach(key => {
+                    const keyEl = document.createElement('div');
+                    keyEl.id = `key-${key.midi}`;
+                    keyEl.dataset.midi = key.midi;
+                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2 cursor-pointer select-none';
+                    keyEl.style.width = `${whiteKeyWidthMm - 0.4}mm`;
+                    keyEl.style.height = `${whiteKeyHeightMm}mm`;
+                    keyEl.style.left = `${key.whitePos * whiteKeyWidthMm + 0.2}mm`;
+
+                    const label = document.createElement('span');
+                    label.className = 'key-label text-[11px] font-black text-slate-700 pointer-events-none select-none';
+                    label.innerText = getLabelText(key);
+                    keyEl.appendChild(label);
+
+                    container.appendChild(keyEl);
+                });
+
+                KEYS_CONFIG.filter(k => k.isBlack).forEach(key => {
+                    const keyEl = document.createElement('div');
+                    keyEl.id = `key-${key.midi}`;
+                    keyEl.dataset.midi = key.midi;
+                    keyEl.className = 'black-key absolute flex flex-col justify-end items-center pb-1.5 cursor-pointer select-none top-0';
+                    keyEl.style.width = `${blackKeyWidthMm}mm`;
+                    keyEl.style.height = `${blackKeyHeightMm}mm`;
+                    const leftMm = (key.whitePos + 1) * whiteKeyWidthMm - (blackKeyWidthMm / 2);
+                    keyEl.style.left = `${leftMm}mm`;
+
+                    const label = document.createElement('span');
+                    label.className = 'key-label text-[9px] font-bold text-slate-200 pointer-events-none select-none';
+                    label.innerText = getLabelText(key);
+                    keyEl.appendChild(label);
+
+                    container.appendChild(keyEl);
+                });
+
+            } else {
+                // Screen-Fit Mode with EXACT Real Melodica Physical Aspect Ratio (1 : 4.25)
+                wrapper.className = 'w-full relative overflow-hidden flex flex-col justify-end';
+                container.style.width = '100%';
+
+                const containerWidth = container.clientWidth || wrapper.clientWidth || 800;
+                const singleWhiteWidth = containerWidth / totalWhiteKeys;
+                
+                const whiteKeyHeight = singleWhiteWidth * 4.25;
+                const blackKeyHeight = whiteKeyHeight * 0.59;
+                const blackKeyWidth = singleWhiteWidth * 0.55;
+
+                container.style.height = `${whiteKeyHeight + 6}px`;
+
+                whiteKeys.forEach(key => {
+                    const keyEl = document.createElement('div');
+                    keyEl.id = `key-${key.midi}`;
+                    keyEl.dataset.midi = key.midi;
+                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2 cursor-pointer select-none';
+                    keyEl.style.width = `${singleWhiteWidth - 2}px`;
+                    keyEl.style.height = `${whiteKeyHeight}px`;
+                    keyEl.style.left = `${key.whitePos * singleWhiteWidth + 1}px`;
+
+                    const label = document.createElement('span');
+                    label.className = 'key-label text-[11px] md:text-xs font-black text-slate-700 pointer-events-none select-none';
+                    label.innerText = getLabelText(key);
+                    keyEl.appendChild(label);
+
+                    container.appendChild(keyEl);
+                });
+
+                KEYS_CONFIG.filter(k => k.isBlack).forEach(key => {
+                    const keyEl = document.createElement('div');
+                    keyEl.id = `key-${key.midi}`;
+                    keyEl.dataset.midi = key.midi;
+                    keyEl.className = 'black-key absolute flex flex-col justify-end items-center pb-1.5 cursor-pointer select-none top-0';
+                    keyEl.style.width = `${blackKeyWidth}px`;
+                    keyEl.style.height = `${blackKeyHeight}px`;
+                    const leftPx = (key.whitePos + 1) * singleWhiteWidth - (blackKeyWidth / 2);
+                    keyEl.style.left = `${leftPx}px`;
+
+                    const label = document.createElement('span');
+                    label.className = 'key-label text-[9px] md:text-[10px] font-bold text-slate-200 pointer-events-none select-none';
+                    label.innerText = getLabelText(key);
+                    keyEl.appendChild(label);
+
+                    container.appendChild(keyEl);
+                });
+            }
+
+            setupPointerListeners(container);
+        }
+
+        function setScaleMode(isMm) {
+            isRealMmScale = isMm;
+            document.getElementById('btn-scale-fit').className = !isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            document.getElementById('btn-scale-mm').className = isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            renderKeyboard();
+        }
+
+        function setupPointerListeners(container) {
+            const updatePointerFromEvent = (e) => {
+                const el = document.elementFromPoint(e.clientX, e.clientY);
+                const keyEl = el ? el.closest('[data-midi]') : null;
+                if (keyEl) {
+                    const midi = parseInt(keyEl.dataset.midi, 10);
+                    activePointerMidis.set(e.pointerId, midi);
+                } else {
+                    activePointerMidis.delete(e.pointerId);
+                }
+                syncKeyStates();
+            };
+
+            container.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                audioEngine.init();
+                updatePointerFromEvent(e);
+            });
+
+            window.addEventListener('pointermove', (e) => {
+                if (e.buttons > 0 || e.pointerType === 'touch') {
+                    updatePointerFromEvent(e);
+                }
+            });
+
+            const clearPointer = (e) => {
+                if (activePointerMidis.has(e.pointerId)) {
+                    activePointerMidis.delete(e.pointerId);
+                    syncKeyStates();
+                }
+            };
+
+            window.addEventListener('pointerup', clearPointer);
+            window.addEventListener('pointercancel', clearPointer);
+            window.addEventListener('pointerleave', clearPointer);
+            window.addEventListener('blur', stopAllNotes);
+        }
+
+        function getLabelText(key) {
+            if (labelMode === 'doremi') return key.doremi;
+            if (labelMode === 'cde') return key.cde;
+            return '';
+        }
+
+        /* -------------------------------------------------------------
+           KEY PRESS / RELEASE ACTIONS
+           ------------------------------------------------------------- */
+        function pressKey(midi) {
+            if (activePressedMidis.has(midi)) return;
+            activePressedMidis.add(midi);
+
+            const keyEl = document.getElementById(`key-${midi}`);
+            if (keyEl) keyEl.classList.add('active');
+
+            audioEngine.startNote(midi);
+            createNoteParticle(midi);
+            checkLessonProgress(midi);
+        }
+
+        function releaseKey(midi) {
+            if (!activePressedMidis.has(midi)) return;
+            activePressedMidis.delete(midi);
+
+            const keyEl = document.getElementById(`key-${midi}`);
+            if (keyEl) keyEl.classList.remove('active');
+
+            audioEngine.stopNote(midi);
+        }
+
+        function createNoteParticle(midi) {
+            const keyEl = document.getElementById(`key-${midi}`);
+            if (!keyEl) return;
+
+            const rect = keyEl.getBoundingClientRect();
+            const particle = document.createElement('div');
+            particle.className = 'note-particle text-amber-400 font-black text-sm drop-shadow-md';
+            particle.innerText = '♪';
+            particle.style.left = `${rect.left + rect.width / 2 - 8}px`;
+            particle.style.top = `${rect.top - 10}px`;
+
+            document.body.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
+        }
+
+        /* -------------------------------------------------------------
+           LABEL & THEME CONTROLS
+           ------------------------------------------------------------- */
+        function setLabelMode(mode) {
+            labelMode = mode;
+            document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            document.getElementById('btn-label-cde').className = mode === 'cde' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            document.getElementById('btn-label-none').className = mode === 'none' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+
+            renderKeyboard();
+            highlightCurrentSongGuide();
+        }
+
+        function setBodyColor(color) {
+            const shell = document.getElementById('pianica-shell');
+            shell.classList.remove('bg-sky-400', 'bg-pink-400', 'bg-amber-300', 'bg-emerald-400');
+
+            if (color === 'sky') shell.classList.add('bg-sky-400');
+            else if (color === 'pink') shell.classList.add('bg-pink-400');
+            else if (color === 'yellow') shell.classList.add('bg-amber-300');
+            else if (color === 'green') shell.classList.add('bg-emerald-400');
+        }
+
+        /* -------------------------------------------------------------
+           LESSON & SONG GUIDE SYSTEM
+           ------------------------------------------------------------- */
+        function loadSelectedSong() {
+            const songKey = document.getElementById('song-select').value;
+            if (!songKey || !SONGS[songKey]) {
+                currentSong = null;
+                songStep = 0;
+                document.getElementById('guide-info').innerText = '曲を選んで練習しよう';
+                document.getElementById('btn-prev-step').disabled = true;
+                document.getElementById('btn-next-step').disabled = true;
+                document.getElementById('btn-auto-play').disabled = true;
+                clearGuideHighlights();
+                return;
+            }
+
+            currentSong = SONGS[songKey];
+            songStep = 0;
+            document.getElementById('btn-prev-step').disabled = false;
+            document.getElementById('btn-next-step').disabled = false;
+            document.getElementById('btn-auto-play').disabled = false;
+
+            updateSongGuideUI();
+        }
+
+        function updateSongGuideUI() {
+            if (!currentSong) return;
+
+            const currentMidi = currentSong.notes[songStep];
+            const keyConfig = KEYS_CONFIG.find(k => k.midi === currentMidi);
+            
+            const songTitle = currentSong.title;
+            const noteText = keyConfig ? keyConfig.doremi : '';
+            const progress = `(${songStep + 1} / ${currentSong.notes.length})`;
+
+            document.getElementById('guide-info').innerText = `${songTitle}: つぎは「 ${noteText} 」 ${progress}`;
+
+            highlightCurrentSongGuide();
+        }
+
+        function highlightCurrentSongGuide() {
+            clearGuideHighlights();
+            if (!currentSong) return;
+
+            const targetMidi = currentSong.notes[songStep];
+            const targetKey = document.getElementById(`key-${targetMidi}`);
+            if (targetKey) {
+                targetKey.classList.add('guide-active');
+                targetKey.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }
+
+        function clearGuideHighlights() {
+            document.querySelectorAll('.guide-active').forEach(el => el.classList.remove('guide-active'));
+        }
+
+        function checkLessonProgress(pressedMidi) {
+            if (!currentSong) return;
+
+            const expectedMidi = currentSong.notes[songStep];
+            if (pressedMidi === expectedMidi) {
+                if (songStep < currentSong.notes.length - 1) {
+                    songStep++;
+                    updateSongGuideUI();
+                } else {
+                    document.getElementById('guide-info').innerText = `🎉 祝！ ${currentSong.title} 演奏完了！`;
+                    clearGuideHighlights();
+                }
+            }
+        }
+
+        function nextSongStep() {
+            if (!currentSong) return;
+            if (songStep < currentSong.notes.length - 1) {
+                songStep++;
+                updateSongGuideUI();
+            }
+        }
+
+        function prevSongStep() {
+            if (!currentSong) return;
+            if (songStep > 0) {
+                songStep--;
+                updateSongGuideUI();
+            }
+        }
+
+        function toggleAutoPlay() {
+            if (autoPlayTimer) {
+                clearInterval(autoPlayTimer);
+                autoPlayTimer = null;
+                document.getElementById('icon-auto-play').className = 'fa-solid fa-play';
+                return;
+            }
+
+            if (!currentSong) return;
+            songStep = 0;
+            document.getElementById('icon-auto-play').className = 'fa-solid fa-stop';
+
+            autoPlayTimer = setInterval(() => {
+                if (songStep >= currentSong.notes.length) {
+                    clearInterval(autoPlayTimer);
+                    autoPlayTimer = null;
+                    document.getElementById('icon-auto-play').className = 'fa-solid fa-play';
+                    return;
+                }
+
+                const midi = currentSong.notes[songStep];
+                pressKey(midi);
+                setTimeout(() => releaseKey(midi), 300);
+
+                songStep++;
+                if (songStep < currentSong.notes.length) {
+                    updateSongGuideUI();
+                }
+            }, 550);
+        }
+
+        /* -------------------------------------------------------------
+           PC KEYBOARD SHORTCUT EVENT LISTENERS & INITIALIZATION
+           ------------------------------------------------------------- */
+        window.addEventListener('keydown', (e) => {
+            if (e.repeat) return;
+            const key = e.key.toLowerCase();
+            if (PC_KEY_MAP[key]) {
+                pcPressedMidis.add(PC_KEY_MAP[key]);
+                syncKeyStates();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            if (PC_KEY_MAP[key]) {
+                pcPressedMidis.delete(PC_KEY_MAP[key]);
+                syncKeyStates();
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            renderKeyboard();
+        });
+
+        window.onload = () => {
+            renderKeyboard();
+
+            // Prevent Context Menu, Text Selection, Dragging, and Double-Tap Zoom globally
+            document.addEventListener('contextmenu', (e) => e.preventDefault(), false);
+            document.addEventListener('selectstart', (e) => e.preventDefault(), false);
+            document.addEventListener('dragstart', (e) => e.preventDefault(), false);
+            document.addEventListener('dblclick', (e) => e.preventDefault(), false);
+
+            let lastTouchEnd = 0;
+            document.addEventListener('touchend', (e) => {
+                const now = Date.now();
+                if (now - lastTouchEnd <= 300) {
+                    e.preventDefault();
+                }
+                lastTouchEnd = now;
+            }, { passive: false });
+        };
+    </script>
+</body>
+</html>

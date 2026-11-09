@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>鍵盤ハーモニカ (32鍵)</title>
-    <meta property="og:title" content="鍵盤ハーモニカ(32鍵)">
-    <meta property="og:description" content="【音楽】鍵盤ハーモニカの学習アプリです。">
-    <meta property="og:type" content="website">
+    <title>3D リアル鍵盤ハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -218,7 +215,6 @@
                     <option value="doremi">ドレミのうた</option>
                     <option value="mary">メリーさんのひつじ</option>
                     <option value="yamano">やまの おんがくか</option>
-                    <option value="mickey">ミッキーマウスマーチ</option>
                 </select>
             </div>
 
@@ -259,8 +255,16 @@
                     <span class="font-black tracking-widest text-white/90 text-sm md:text-base drop-shadow">PIANICA 32</span>
                 </div>
 
-                <div class="text-xs font-bold text-white/80 bg-black/20 px-3 py-0.5 rounded-full border border-white/20">
-                    鍵盤音域: F3 ～ C6 (全19白鍵・32鍵)
+                <div class="flex items-center gap-2">
+                    <!-- KEYBOARD POSITION SCROLL LOCK BUTTON -->
+                    <button id="btn-scroll-lock" onclick="toggleScrollLock()" class="bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs px-3 py-1 rounded-full border border-amber-300 shadow flex items-center gap-1.5 transition-all cursor-pointer">
+                        <i id="icon-scroll-lock" class="fa-solid fa-lock"></i>
+                        <span id="text-scroll-lock">位置ロック中</span>
+                    </button>
+
+                    <div class="text-xs font-bold text-white/80 bg-black/20 px-3 py-0.5 rounded-full border border-white/20 hidden sm:block">
+                        鍵盤音域: F3 ～ C6 (全19白鍵・32鍵)
+                    </div>
                 </div>
             </div>
 
@@ -445,10 +449,6 @@
             yamano: {
                 title: "やまの おんがくか",
                 notes: [60, 62, 64, 65, 67, 67, 67, 69, 67, 65, 64, 62, 60, 64, 67, 60, 64, 67]
-            },
-            mickey: {
-                title: "ミッキーマウスマーチ",
-                notes: [60, 60, 60, 60, 62, 64, 65, 67, 67, 67, 69, 69, 69, 67, 65, 64, 62, 60, 67, 64, 60, 62, 64, 65, 67, 67, 67, 69, 67, 65, 64, 62, 60]
             }
         };
 
@@ -462,6 +462,7 @@
 
         let labelMode = 'none';
         let isRealMmScale = true; // デフォルトで実物大モード
+        let isScrollLocked = true; // デフォルトでスクロールロック状態 (初期位置固定)
         let currentSong = null;
         let songStep = 0;
         let autoPlayTimer = null;
@@ -508,8 +509,8 @@
             const totalWhiteKeys = whiteKeys.length; // 19
 
             if (isRealMmScale) {
-                // Chromebook画面上で実寸19mmになるようスケール調整
-                wrapper.className = 'w-full relative overflow-x-auto flex items-end pb-1';
+                // Chromebook画面上で実寸19mmになるようスケール調整 (ロック状態に応じてoverflow制御)
+                wrapper.className = `w-full relative ${isScrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'} flex items-end pb-1`;
                 container.style.width = `${19 * 26.6}mm`;
                 container.style.height = `118mm`;
                 
@@ -614,11 +615,48 @@
             setupPointerListeners(container);
         }
 
+        /* -------------------------------------------------------------
+           SCROLL LOCK TOGGLE CONTROLS
+           ------------------------------------------------------------- */
+        function toggleScrollLock() {
+            isScrollLocked = !isScrollLocked;
+            updateScrollLockUI();
+
+            const wrapper = document.getElementById('keyboard-wrapper');
+            if (wrapper && isRealMmScale) {
+                if (isScrollLocked) {
+                    wrapper.classList.remove('overflow-x-auto');
+                    wrapper.classList.add('overflow-x-hidden');
+                } else {
+                    wrapper.classList.remove('overflow-x-hidden');
+                    wrapper.classList.add('overflow-x-auto');
+                }
+            }
+        }
+
+        function updateScrollLockUI() {
+            const btn = document.getElementById('btn-scroll-lock');
+            const icon = document.getElementById('icon-scroll-lock');
+            const text = document.getElementById('text-scroll-lock');
+            if (!btn || !icon || !text) return;
+
+            if (isScrollLocked) {
+                btn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs px-3 py-1 rounded-full border border-amber-300 shadow flex items-center gap-1.5 transition-all cursor-pointer';
+                icon.className = 'fa-solid fa-lock';
+                text.innerText = '位置ロック中';
+            } else {
+                btn.className = 'bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs px-3 py-1 rounded-full border border-amber-400/60 shadow flex items-center gap-1.5 transition-all cursor-pointer animate-pulse';
+                icon.className = 'fa-solid fa-lock-open';
+                text.innerText = '移動OK (ロック解除)';
+            }
+        }
+
         function setScaleMode(isMm) {
             isRealMmScale = isMm;
             document.getElementById('btn-scale-fit').className = !isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
             document.getElementById('btn-scale-mm').className = isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
             renderKeyboard();
+            updateScrollLockUI();
         }
 
         function setupPointerListeners(container) {
@@ -870,6 +908,7 @@
 
         window.onload = () => {
             renderKeyboard();
+            updateScrollLockUI();
 
             // Prevent Context Menu, Text Selection, Dragging, and Double-Tap Zoom globally
             document.addEventListener('contextmenu', (e) => e.preventDefault(), false);

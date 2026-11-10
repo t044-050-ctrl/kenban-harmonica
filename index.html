@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-       <title>鍵盤タップハーモニカ</title>
-    <meta property="og:title" content="鍵盤タップハーモニカ">
-    <meta property="og:description" content="【音楽】鍵盤ハーモニカの学習アプリです。">
-    <meta property="og:type" content="website">
+    <title>鍵盤タップハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -180,24 +177,24 @@
                 <!-- Display Mode (なし / ドレミ) -->
                 <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-tag mr-1 text-sky-400"></i>音名:</span>
-                    <button id="btn-label-none" onclick="setLabelMode('none')" class="px-2 py-1 rounded font-bold bg-sky-500 text-white shadow">なし</button>
-                    <button id="btn-label-doremi" onclick="setLabelMode('doremi')" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">ドレミ</button>
+                    <button id="btn-label-none" onclick="setLabelMode('none', event)" onpointerdown="setLabelMode('none', event)" class="px-2 py-1 rounded font-bold bg-sky-500 text-white shadow active:scale-95 cursor-pointer">なし</button>
+                    <button id="btn-label-doremi" onclick="setLabelMode('doremi', event)" onpointerdown="setLabelMode('doremi', event)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer">ドレミ</button>
                 </div>
 
                 <!-- Scale Mode (Real Proportion vs 1:1 Physical mm) -->
                 <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-ruler-horizontal mr-1 text-emerald-400"></i>サイズ:</span>
-                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">本物の大きさにする</button>
-                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">鍵盤全体(32鍵)にする</button>
+                    <button id="btn-scale-mm" onclick="setScaleMode(true, event)" onpointerdown="setScaleMode(true, event)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow active:scale-95 cursor-pointer">本物の大きさにする</button>
+                    <button id="btn-scale-fit" onclick="setScaleMode(false, event)" onpointerdown="setScaleMode(false, event)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer">鍵盤全体(32鍵)にする</button>
                 </div>
 
                 <!-- Color Theme Selector -->
                 <div class="flex items-center gap-1.5 bg-slate-700/80 rounded-lg p-1.5 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-palette mr-1 text-pink-400"></i>本体色:</span>
-                    <button onclick="setBodyColor('sky')" class="w-6 h-6 rounded-full bg-sky-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
-                    <button onclick="setBodyColor('pink')" class="w-6 h-6 rounded-full bg-pink-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
-                    <button onclick="setBodyColor('yellow')" class="w-6 h-6 rounded-full bg-amber-300 border-2 border-white shadow hover:scale-110 transition-transform"></button>
-                    <button onclick="setBodyColor('green')" class="w-6 h-6 rounded-full bg-emerald-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
+                    <button onclick="setBodyColor('sky', event)" onpointerdown="setBodyColor('sky', event)" class="w-6 h-6 rounded-full bg-sky-400 border-2 border-white shadow hover:scale-110 active:scale-95 transition-transform cursor-pointer"></button>
+                    <button onclick="setBodyColor('pink', event)" onpointerdown="setBodyColor('pink', event)" class="w-6 h-6 rounded-full bg-pink-400 border-2 border-white shadow hover:scale-110 active:scale-95 transition-transform cursor-pointer"></button>
+                    <button onclick="setBodyColor('yellow', event)" onpointerdown="setBodyColor('yellow', event)" class="w-6 h-6 rounded-full bg-amber-300 border-2 border-white shadow hover:scale-110 active:scale-95 transition-transform cursor-pointer"></button>
+                    <button onclick="setBodyColor('green', event)" onpointerdown="setBodyColor('green', event)" class="w-6 h-6 rounded-full bg-emerald-400 border-2 border-white shadow hover:scale-110 active:scale-95 transition-transform cursor-pointer"></button>
                 </div>
 
                 <!-- Volume Controls (Fixed Position, Icon Mute, 1.5x Slider, 0-5 Tap & Drag) -->
@@ -902,7 +899,7 @@
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 
                 const isKeybed = e.target.closest('#keyboard-container') || e.target.closest('#keyboard-wrapper') || e.target.closest('.pianica-body');
-                if (isKeybed || e.touches.length > 0) {
+                if (isKeybed) {
                     if (e.cancelable) e.preventDefault();
                 }
                 audioEngine.init();
@@ -1097,15 +1094,54 @@
         /* -------------------------------------------------------------
            LABEL & THEME CONTROLS
            ------------------------------------------------------------- */
-        function setLabelMode(mode) {
+        let lastLabelModeToggle = 0;
+        function setLabelMode(mode, e) {
+            if (e) {
+                e.stopPropagation();
+            }
+            const now = Date.now();
+            if (now - lastLabelModeToggle < 150 && labelMode === mode) return;
+            lastLabelModeToggle = now;
+
             labelMode = mode;
-            document.getElementById('btn-label-none').className = mode === 'none' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
-            document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
+            document.getElementById('btn-label-none').className = mode === 'none' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow active:scale-95 cursor-pointer' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer';
+            document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow active:scale-95 cursor-pointer' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer';
 
             renderKeyboard();
         }
 
-        function setBodyColor(color) {
+        let lastScaleModeToggle = 0;
+        function setScaleMode(isMm, e) {
+            if (e) {
+                e.stopPropagation();
+            }
+            const now = Date.now();
+            if (now - lastScaleModeToggle < 150 && isRealMmScale === isMm) return;
+            lastScaleModeToggle = now;
+
+            const wasFit = !isRealMmScale;
+            isRealMmScale = isMm;
+            
+            // 「鍵盤全体」から「本物の大きさ」に戻したときに初期位置にリセット
+            if (isMm && wasFit) {
+                shouldResetScroll = true;
+            }
+
+            document.getElementById('btn-scale-fit').className = !isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow active:scale-95 cursor-pointer' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer';
+            document.getElementById('btn-scale-mm').className = isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow active:scale-95 cursor-pointer' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300 active:scale-95 cursor-pointer';
+            renderKeyboard();
+            updateScrollLockUI();
+        }
+
+        let lastBodyColorToggle = 0;
+        function setBodyColor(color, e) {
+            if (e) {
+                e.stopPropagation();
+            }
+            const now = Date.now();
+            if (now - lastBodyColorToggle < 150) return;
+            lastBodyColorToggle = now;
+
             const shell = document.getElementById('pianica-shell');
             shell.classList.remove('bg-sky-400', 'bg-pink-400', 'bg-amber-300', 'bg-emerald-400');
 

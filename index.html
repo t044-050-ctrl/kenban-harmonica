@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-       <title>鍵盤タップハーモニカ</title>
-    <meta property="og:title" content="鍵盤タップハーモニカ">
-    <meta property="og:description" content="【音楽】鍵盤ハーモニカの学習アプリです。">
-    <meta property="og:type" content="website">
+    <title>鍵盤タップハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -169,7 +166,7 @@
                     <i class="fa-solid font-bold">32</i>
                 </div>
                 <div>
-                    <h1 class="text-lg md:text-xl font-black text-sky-400 leading-tight">リアル鍵盤ハーモニカ</h1>
+                    <h1 class="text-lg md:text-xl font-black text-sky-400 leading-tight">鍵盤タップハーモニカ</h1>
                     <p class="text-xs text-slate-400">学校用アルト32鍵 (F3〜C6)</p>
                 </div>
             </div>
@@ -187,8 +184,8 @@
                 <!-- Scale Mode (Real Proportion vs 1:1 Physical mm) -->
                 <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-1 border border-slate-600">
                     <span class="text-slate-300 font-semibold px-1"><i class="fa-solid fa-ruler-horizontal mr-1 text-emerald-400"></i>サイズ:</span>
-                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">画面フィット (実寸比率)</button>
-                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">実物大 1:1 mm</button>
+                    <button id="btn-scale-mm" onclick="setScaleMode(true)" class="px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow">本物の大きさにする</button>
+                    <button id="btn-scale-fit" onclick="setScaleMode(false)" class="px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300">鍵盤全体(32鍵)にする</button>
                 </div>
 
                 <!-- Color Theme Selector -->
@@ -295,26 +292,35 @@
                 this.activeNotes = new Map();
                 this.masterGain = null;
                 this.compressor = null;
+                this.masterFilter = null;
             }
 
             init() {
                 if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
-                    this.ctx = new AudioContext();
+                    // 超低遅延インタラクティブモード指定
+                    this.ctx = new AudioContext({ latencyHint: 'interactive' });
 
                     // 複数音（和音）同時発音時の音割れ・消音を防ぐマスターコンプレッサー
                     this.masterGain = this.ctx.createGain();
                     const initGain = typeof currentGainValue !== 'undefined' ? currentGainValue : 0.6;
                     this.masterGain.gain.setValueAtTime(initGain, this.ctx.currentTime);
 
-                    this.compressor = this.ctx.createDynamicsCompressor();
-                    this.compressor.threshold.setValueAtTime(-12, this.ctx.currentTime);
-                    this.compressor.knee.setValueAtTime(30, this.ctx.currentTime);
-                    this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);
-                    this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
-                    this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+                    // マスターローパスフィルター（明瞭な音色を活かしつつ極端な高音ノイズのみカット）
+                    this.masterFilter = this.ctx.createBiquadFilter();
+                    this.masterFilter.type = 'lowpass';
+                    this.masterFilter.frequency.setValueAtTime(4800, this.ctx.currentTime);
+                    this.masterFilter.Q.setValueAtTime(1.0, this.ctx.currentTime);
 
-                    this.masterGain.connect(this.compressor);
+                    this.compressor = this.ctx.createDynamicsCompressor();
+                    this.compressor.threshold.setValueAtTime(-14, this.ctx.currentTime);
+                    this.compressor.knee.setValueAtTime(18, this.ctx.currentTime);
+                    this.compressor.ratio.setValueAtTime(6, this.ctx.currentTime);
+                    this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+                    this.compressor.release.setValueAtTime(0.12, this.ctx.currentTime);
+
+                    this.masterGain.connect(this.masterFilter);
+                    this.masterFilter.connect(this.compressor);
                     this.compressor.connect(this.ctx.destination);
                 }
                 if (this.ctx.state === 'suspended') {
@@ -334,37 +340,53 @@
 
             startNote(midi) {
                 this.init();
-                if (this.activeNotes.has(midi)) return;
-
-                const freq = this.midiToFreq(midi);
                 const now = this.ctx.currentTime;
 
+                // 既に再生中・消音処理中の同音があれば安全にクリーンアップして再発音
+                if (this.activeNotes.has(midi)) {
+                    const existing = this.activeNotes.get(midi);
+                    if (existing.stopTimer) clearTimeout(existing.stopTimer);
+                    try {
+                        existing.osc1.stop();
+                        existing.osc2.stop();
+                    } catch(e){}
+                    this.activeNotes.delete(midi);
+                }
+
+                const freq = this.midiToFreq(midi);
+
+                // 本物の鍵盤ハーモニカらしい明瞭で歯切れの良いリード音（スクエア波 ＋ のこぎり波）
                 const osc1 = this.ctx.createOscillator();
-                osc1.type = 'sawtooth';
+                osc1.type = 'square';
                 osc1.frequency.setValueAtTime(freq, now);
 
-                const osc2 = this.ctx.createOscillator();
-                osc2.type = 'square';
-                osc2.frequency.setValueAtTime(freq * 1.002, now);
+                const osc2Obj = this.ctx.createOscillator();
+                osc2Obj.type = 'sawtooth';
+                osc2Obj.frequency.setValueAtTime(freq, now);
+
+                const osc2Gain = this.ctx.createGain();
+                osc2Gain.gain.setValueAtTime(0.3, now);
+
+                osc2Obj.connect(osc2Gain);
 
                 const filter = this.ctx.createBiquadFilter();
                 filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(freq * 3.5, now);
-                filter.Q.setValueAtTime(1.5, now);
+                filter.frequency.setValueAtTime(Math.min(freq * 3.5, 4200), now);
+                filter.Q.setValueAtTime(1.0, now);
 
                 const gain = this.ctx.createGain();
                 gain.gain.setValueAtTime(0.001, now);
-                gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
+                gain.gain.linearRampToValueAtTime(0.18, now + 0.005);
 
                 osc1.connect(filter);
-                osc2.connect(filter);
+                osc2Gain.connect(filter);
                 filter.connect(gain);
                 gain.connect(this.masterGain || this.ctx.destination);
 
                 osc1.start(now);
-                osc2.start(now);
+                osc2Obj.start(now);
 
-                this.activeNotes.set(midi, { osc1, osc2, gain, filter });
+                this.activeNotes.set(midi, { osc1, osc2: osc2Obj, gain, filter, startTime: now });
             }
 
             stopNote(midi) {
@@ -373,12 +395,20 @@
                 const note = this.activeNotes.get(midi);
                 const now = this.ctx.currentTime;
 
-                note.gain.gain.cancelScheduledValues(now);
-                const currentGain = Math.max(0.001, note.gain.gain.value);
-                note.gain.gain.setValueAtTime(currentGain, now);
-                note.gain.gain.linearRampToValueAtTime(0.0001, now + 0.05);
+                const minDuration = 0.05; 
+                const elapsedTime = now - note.startTime;
+                const releaseStartTime = elapsedTime < minDuration ? note.startTime + minDuration : now;
+                const releaseDuration = 0.08;
 
-                setTimeout(() => {
+                try {
+                    note.gain.gain.cancelScheduledValues(now);
+                    note.gain.gain.setValueAtTime(note.gain.gain.value || 0.18, now);
+                    note.gain.gain.linearRampToValueAtTime(0.0001, releaseStartTime + releaseDuration);
+                } catch (e) {}
+
+                const delayMs = Math.max(10, Math.round((releaseStartTime + releaseDuration - now) * 1000) + 10);
+
+                note.stopTimer = setTimeout(() => {
                     try {
                         note.osc1.stop();
                         note.osc2.stop();
@@ -386,9 +416,10 @@
                         note.osc2.disconnect();
                         note.gain.disconnect();
                     } catch (e) {}
-                }, 60);
-
-                this.activeNotes.delete(midi);
+                    if (this.activeNotes.get(midi) === note) {
+                        this.activeNotes.delete(midi);
+                    }
+                }, delayMs);
             }
         }
 
@@ -402,6 +433,11 @@
         window.addEventListener('touchstart', unlockAudioContext, { capture: true });
         window.addEventListener('mousedown', unlockAudioContext, { capture: true });
         window.addEventListener('keydown', unlockAudioContext, { capture: true });
+
+        // iOS/Androidでのマルチジェスチャー（ピンチズーム・拡大処理）の介入による音声強制キャンセルを防止
+        window.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+        window.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+        window.addEventListener('gestureend', (e) => e.preventDefault(), { passive: false });
 
         // 全画面での長押しコンテキストメニュー表示を完全に防ぐ
         window.addEventListener('contextmenu', (e) => {
@@ -541,6 +577,7 @@
         let isRealMmScale = true; // デフォルトで実物大モード
         let isScrollLocked = true; // デフォルトでスクロールロック状態
         let isInitialRender = true; // 初回レンダリング判定用
+        let shouldResetScroll = false; // 「本物の大きさ」切替時のスクロールリセットフラグ
         let currentVolLevel = 3; // 初期音量レベル (0〜5)
         let lastVolLevel = 3; // 消音解除時の復元用
         let currentGainValue = 0.6; // 3/5 = 0.6
@@ -548,6 +585,25 @@
         let activeTouchMidis = new Set();
         const activePointerMidis = new Map();
         const activePressedMidis = new Set();
+        let cachedKeyRects = [];
+
+        // 鍵盤の画面上での座標情報をあらかじめ高速ロードして保持するキャッシュ関数
+        function updateKeyRectsCache() {
+            const keys = document.querySelectorAll('[data-midi]');
+            cachedKeyRects = Array.from(keys).map(keyEl => {
+                const rect = keyEl.getBoundingClientRect();
+                return {
+                    midi: parseInt(keyEl.dataset.midi, 10),
+                    isBlack: keyEl.classList.contains('black-key'),
+                    isWhite: keyEl.classList.contains('white-key'),
+                    left: rect.left,
+                    right: rect.right,
+                    top: rect.top,
+                    bottom: rect.bottom,
+                    centerX: rect.left + rect.width / 2
+                };
+            });
+        }
 
         /* -------------------------------------------------------------
            TOUCH / POINTER STATE SYNC
@@ -636,24 +692,25 @@
 
                     container.appendChild(keyEl);
                 });
-
-                // アプリ初回起動時のみ初期位置(A3)へ移動し、それ以降は現在のスライド位置を保持
+                // アプリ初回起動時および「全体表示」から「本物の大きさ」切替時に初期位置(A3)へ移動
                 requestAnimationFrame(() => {
-                    if (isInitialRender) {
+                    if (isInitialRender || shouldResetScroll) {
                         const key2El = document.getElementById('key-57'); // whitePos 2 (A3)
                         if (key2El) {
                             wrapper.scrollLeft = key2El.offsetLeft;
                         }
                         isInitialRender = false;
+                        shouldResetScroll = false;
                     } else {
                         wrapper.scrollLeft = prevScrollLeft;
                     }
+                    updateKeyRectsCache();
                 });
 
             } else {
-                wrapper.className = `w-full relative ${isScrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'} flex flex-col justify-end`;
-                // スライドした表示位置をロック時も保つため幅を135%に固定
-                container.style.width = '135%';
+                wrapper.className = 'w-full relative overflow-hidden flex flex-col justify-end';
+                // 全32鍵盤（19白鍵）が画面幅100%に縮小して横スクロールなしでピッタリ収まるよう調整
+                container.style.width = '100%';
 
                 const containerWidth = container.clientWidth || wrapper.clientWidth || 800;
                 const singleWhiteWidth = containerWidth / totalWhiteKeys;
@@ -669,12 +726,12 @@
                     keyEl.id = `key-${key.midi}`;
                     keyEl.dataset.midi = key.midi;
                     keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2.5 cursor-pointer select-none';
-                    keyEl.style.width = `${singleWhiteWidth - 2}px`;
+                    keyEl.style.width = `${singleWhiteWidth - 1}px`;
                     keyEl.style.height = `${whiteKeyHeight}px`;
-                    keyEl.style.left = `${key.whitePos * singleWhiteWidth + 1}px`;
+                    keyEl.style.left = `${key.whitePos * singleWhiteWidth + 0.5}px`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-xl md:text-2xl font-black text-slate-900 pointer-events-none select-none tracking-tighter leading-none drop-shadow-sm';
+                    label.className = 'key-label text-xs sm:text-sm md:text-base font-black text-slate-900 pointer-events-none select-none tracking-tighter leading-none drop-shadow-sm';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -692,7 +749,7 @@
                     keyEl.style.left = `${leftPx}px`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-xs md:text-sm font-black text-slate-100 pointer-events-none select-none tracking-tighter leading-none';
+                    label.className = 'key-label text-[9px] sm:text-[10px] md:text-xs font-black text-slate-100 pointer-events-none select-none tracking-tighter leading-none';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -700,11 +757,13 @@
                 });
 
                 requestAnimationFrame(() => {
-                    wrapper.scrollLeft = prevScrollLeft;
+                    wrapper.scrollLeft = 0;
+                    updateKeyRectsCache();
                 });
             }
 
             setupPointerListeners(container);
+            updateKeyRectsCache();
         }
 
         /* -------------------------------------------------------------
@@ -758,18 +817,73 @@
         }
 
         function setScaleMode(isMm) {
+            const wasFit = !isRealMmScale;
             isRealMmScale = isMm;
+            
+            // 「鍵盤全体」から「本物の大きさ」に戻したときに初期位置にリセット
+            if (isMm && wasFit) {
+                shouldResetScroll = true;
+            }
+
             document.getElementById('btn-scale-fit').className = !isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
             document.getElementById('btn-scale-mm').className = isMm ? 'px-2 py-1 rounded font-bold bg-emerald-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
             renderKeyboard();
             updateScrollLockUI();
         }
 
+        /* タッチ座標から最も適切な鍵盤を確実に算出するスマート判定関数 */
+        function getKeyFromPoint(x, y) {
+            const el = document.elementFromPoint(x, y);
+            if (el) {
+                const keyEl = el.closest('[data-midi]');
+                if (keyEl) return parseInt(keyEl.dataset.midi, 10);
+            }
+
+            // キャッシュした位置情報を使ってDOM再計算（リフロー）を起こさずに超高速判定
+            if (!cachedKeyRects || cachedKeyRects.length === 0) {
+                updateKeyRectsCache();
+            }
+
+            // 1. 黒鍵を優先チェック
+            for (let i = 0; i < cachedKeyRects.length; i++) {
+                const item = cachedKeyRects[i];
+                if (item.isBlack && x >= item.left && x <= item.right && y >= item.top && y <= item.bottom) {
+                    return item.midi;
+                }
+            }
+
+            // 2. 最も近い白鍵を判定
+            let bestMidi = null;
+            let minDistance = Infinity;
+            for (let i = 0; i < cachedKeyRects.length; i++) {
+                const item = cachedKeyRects[i];
+                if (item.isWhite) {
+                    if (x >= item.left && x <= item.right && y >= item.top && y <= item.bottom) {
+                        return item.midi;
+                    }
+                    if (y >= item.top && y <= item.bottom) {
+                        const dist = Math.abs(x - item.centerX);
+                        if (dist < minDistance) {
+                            minDistance = dist;
+                            bestMidi = item.midi;
+                        }
+                    }
+                }
+            }
+            return bestMidi;
+        }
+
+        let touchListenersInitialized = false;
+        const touchIdToMidiMap = new Map();
+
         function setupPointerListeners(container) {
             const wrapper = document.getElementById('keyboard-wrapper') || container;
+            if (wrapper) {
+                wrapper.addEventListener('scroll', updateKeyRectsCache, { passive: true });
+            }
 
-            // タッチ識別子(Touch ID)ごとの押下音階管理マップ
-            const touchIdToMidiMap = new Map();
+            if (touchListenersInitialized) return;
+            touchListenersInitialized = true;
 
             // 位置ロック解除時の指・マウスドラッグ移動制御用
             let touchStartX = 0;
@@ -780,27 +894,27 @@
             let mouseStartX = 0;
             let mouseStartScrollLeft = 0;
 
-            // マルチタッチ（複数指同時押し・長押し完全対応＆白鍵左右1mm誤タップ防止ゾーン）
+            // マルチタッチ（複数指同時押し・長押し完全対応＆隙間不感帯問題の解消）
             const handleTouch = (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
                 
-                if (e.cancelable) {
-                    const isKeybed = e.target.closest('#keyboard-container') || e.target.closest('#keyboard-wrapper') || e.target.closest('.pianica-body');
-                    if (isKeybed || e.touches.length > 1) {
-                        e.preventDefault();
-                    }
+                const isKeybed = e.target.closest('#keyboard-container') || e.target.closest('#keyboard-wrapper') || e.target.closest('.pianica-body');
+                if (isKeybed || e.touches.length > 0) {
+                    if (e.cancelable) e.preventDefault();
                 }
                 audioEngine.init();
+
+                const currentWrapper = document.getElementById('keyboard-wrapper') || wrapper;
 
                 // 位置ロック解除時 (isScrollLocked === false) の指による左右スワイプ移動
                 if (!isScrollLocked) {
                     if (e.type === 'touchstart' && e.touches.length === 1) {
                         touchStartX = e.touches[0].clientX;
-                        touchStartScrollLeft = wrapper.scrollLeft;
+                        touchStartScrollLeft = currentWrapper.scrollLeft;
                         isTouchSwiping = true;
                     } else if (e.type === 'touchmove' && isTouchSwiping && e.touches.length === 1) {
                         const deltaX = e.touches[0].clientX - touchStartX;
-                        wrapper.scrollLeft = touchStartScrollLeft - deltaX;
+                        currentWrapper.scrollLeft = touchStartScrollLeft - deltaX;
                     }
                 }
                 if (e.type === 'touchend' || e.type === 'touchcancel') {
@@ -811,44 +925,35 @@
 
                 const activeTouchIds = new Set();
                 const touchMidis = new Set();
+                const isMultiTouch = e.touches.length > 1;
 
                 for (let i = 0; i < e.touches.length; i++) {
                     const touch = e.touches[i];
                     activeTouchIds.add(touch.identifier);
 
-                    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-                    const keyEl = el ? el.closest('[data-midi]') : null;
+                    let assignedMidi = null;
+                    const newMidi = getKeyFromPoint(touch.clientX, touch.clientY);
 
-                    if (keyEl) {
-                        const midi = parseInt(keyEl.dataset.midi, 10);
-                        const isWhiteKey = keyEl.classList.contains('white-key');
-
-                        if (isWhiteKey) {
-                            const rect = keyEl.getBoundingClientRect();
-                            // 白鍵の左右1mm相当の不感帯（デッドゾーン）を計算 (26.6mm中1mm)
-                            const deadZonePx = rect.width * (1.0 / 26.6);
-                            const relX = touch.clientX - rect.left;
-
-                            // 左右1mmの内側の時のみ有効に発音（隣の白鍵誤判定を防ぐ）
-                            if (relX >= deadZonePx && relX <= (rect.width - deadZonePx)) {
-                                touchIdToMidiMap.set(touch.identifier, midi);
-                                touchMidis.add(midi);
-                            } else if (touchIdToMidiMap.has(touch.identifier)) {
-                                // 既に押下中の音階を維持
-                                touchMidis.add(touchIdToMidiMap.get(touch.identifier));
-                            }
+                    if (touchIdToMidiMap.has(touch.identifier)) {
+                        const currentMidi = touchIdToMidiMap.get(touch.identifier);
+                        if (isMultiTouch) {
+                            // 和音（2本以上の指）長押し時は、指先の微振動で音が消えないよう最初の音階を完全に固定保持
+                            assignedMidi = currentMidi;
                         } else {
-                            // 黒鍵は通常の判定
-                            touchIdToMidiMap.set(touch.identifier, midi);
-                            touchMidis.add(midi);
+                            // 単音演奏時のみスライド移動を許可
+                            assignedMidi = (newMidi !== null) ? newMidi : currentMidi;
                         }
-                    } else if (touchIdToMidiMap.has(touch.identifier)) {
-                        // 長押し中に指先がミリ単位でずれたり隙間に接触しても音を維持
-                        touchMidis.add(touchIdToMidiMap.get(touch.identifier));
+                    } else {
+                        assignedMidi = newMidi;
+                    }
+
+                    if (assignedMidi !== null) {
+                        touchIdToMidiMap.set(touch.identifier, assignedMidi);
+                        touchMidis.add(assignedMidi);
                     }
                 }
 
-                // 離された指のタッチIDを解除
+                // 画面から離れたタッチIDのみマップから削除
                 for (const [id] of touchIdToMidiMap) {
                     if (!activeTouchIds.has(id)) {
                         touchIdToMidiMap.delete(id);
@@ -1063,6 +1168,7 @@
 
         window.addEventListener('resize', () => {
             renderKeyboard();
+            updateKeyRectsCache();
         });
 
         /* -------------------------------------------------------------
@@ -1072,6 +1178,7 @@
             renderKeyboard();
             updateScrollLockUI();
             setVolumeLevel(3); // 初期音量レベル3を適用
+            updateKeyRectsCache();
         });
     </script>
 </body>

@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>鍵盤ハーモニカ (32鍵)</title>
-    <meta property="og:title" content="鍵盤ハーモニカ(32鍵)">
-    <meta property="og:description" content="【音楽】鍵盤ハーモニカの学習アプリです。">
-    <meta property="og:type" content="website">
+    <title>3D リアル鍵盤ハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -79,12 +76,6 @@
                 0 2px 4px rgba(0,0,0,0.2);
         }
 
-        /* Highlighted for melody guide */
-        .white-key.guide-active {
-            background: linear-gradient(to bottom, #fff9c4 0%, #fff176 75%, #fbc02d 100%) !important;
-            box-shadow: 0 0 15px #fbc02d, 0 6px 0 #c79a00 !important;
-        }
-
         /* 3D Black Key */
         .black-key {
             background: linear-gradient(to bottom, #333333 0%, #111111 70%, #222222 100%);
@@ -107,11 +98,6 @@
                 1px 0 2px rgba(0,0,0,0.4),
                 0 2px 0 #000000,
                 0 3px 5px rgba(0,0,0,0.4);
-        }
-
-        .black-key.guide-active {
-            background: linear-gradient(to bottom, #ff9800 0%, #f57c00 100%) !important;
-            box-shadow: 0 0 15px #ff9800, 0 4px 0 #e65100 !important;
         }
 
         /* Hose / Blow Pipe Simulation */
@@ -152,6 +138,18 @@
             z-index: 50;
         }
     </style>
+
+    <!-- FIREBASE SDK INJECTION FOR CLOUD SONG SHARING -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.FirebaseLib = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, addDoc
+        };
+    </script>
 </head>
 <body class="bg-slate-950 text-slate-100 w-screen h-screen flex items-center justify-center overflow-hidden">
 
@@ -169,7 +167,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg md:text-xl font-black text-sky-400 leading-tight">リアル鍵盤ハーモニカ</h1>
-                    <p class="text-xs text-slate-400">学校用アルト32鍵 (F3〜C6) | PC操作: [Z]〜[M] / [Q]〜[U]</p>
+                    <p class="text-xs text-slate-400">学校用アルト32鍵 (F3〜C6)</p>
                 </div>
             </div>
 
@@ -199,45 +197,38 @@
                     <button onclick="setBodyColor('green')" class="w-6 h-6 rounded-full bg-emerald-400 border-2 border-white shadow hover:scale-110 transition-transform"></button>
                 </div>
 
+                <!-- Volume Controls (Fixed Position, Icon Mute, 1.5x Slider, 0-5 Tap & Drag) -->
+                <div class="bg-slate-700/80 rounded-lg p-1.5 flex items-center gap-2 border border-slate-600 flex-shrink-0">
+                    <!-- 消音 (Mute) イラストボタン -->
+                    <button id="btn-mute" onclick="toggleMute()" title="消音 (ミュート)" class="w-8 h-8 rounded-lg font-bold bg-slate-600 hover:bg-slate-500 text-slate-200 transition-all flex items-center justify-center border border-slate-500 shadow-sm active:scale-95">
+                        <i id="mute-icon" class="fa-solid fa-volume-high text-amber-400 text-base"></i>
+                    </button>
+                    
+                    <!-- 音量ラベル -->
+                    <span class="text-slate-400 font-bold text-xs pl-0.5">音量</span>
+
+                    <!-- 0〜5目盛り数字とスライダーのX座標を完全に揃えたコンテナ -->
+                    <div class="flex flex-col items-center gap-0.5">
+                        <!-- 0 ~ 5 数字列 (スライダーとまったく同じ幅 w-32 md:w-40 で均等配置) -->
+                        <div class="w-32 md:w-40 flex items-center justify-between text-[11px] font-bold text-slate-300 px-1">
+                            <button onclick="setVolumeLevel(0)" class="vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-vol="0">0</button>
+                            <button onclick="setVolumeLevel(1)" class="vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-vol="1">1</button>
+                            <button onclick="setVolumeLevel(2)" class="vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-vol="2">2</button>
+                            <button onclick="setVolumeLevel(3)" class="vol-step-btn font-black text-amber-400 scale-110 transition-all cursor-pointer" data-vol="3">3</button>
+                            <button onclick="setVolumeLevel(4)" class="vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-vol="4">4</button>
+                            <button onclick="setVolumeLevel(5)" class="vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-vol="5">5</button>
+                        </div>
+                        
+                        <!-- スライダー (w-32 md:w-40) -->
+                        <input type="range" id="volume-slider" min="0" max="5" step="1" value="3" 
+                               oninput="setVolumeLevel(this.value)" 
+                               class="w-32 md:w-40 h-2.5 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-amber-400">
+                    </div>
+                </div>
+
             </div>
         </div>
     </header>
-
-    <!-- LESSON & SONG GUIDE SECTION -->
-    <section class="bg-slate-800/60 border-b border-slate-700/50 py-2 px-4">
-        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <i class="fa-solid fa-music text-amber-400 text-lg"></i>
-                <span class="font-bold text-sm text-slate-200">練習曲メロディガイド:</span>
-                <select id="song-select" onchange="loadSelectedSong()" class="bg-slate-700 text-white rounded-lg px-3 py-1 font-bold text-xs md:text-sm border border-slate-600 focus:outline-none focus:border-amber-400">
-                    <option value="">曲を選択してください...</option>
-                    <option value="kaeru">かえるの合唱</option>
-                    <option value="tulip">チューリップ</option>
-                    <option value="twinkle">きらきら星</option>
-                    <option value="joy">かんきのおうた (ベートーヴェン)</option>
-                    <option value="doremi">ドレミのうた</option>
-                    <option value="mary">メリーさんのひつじ</option>
-                    <option value="yamano">やまの おんがくか</option>
-                </select>
-            </div>
-
-            <!-- Song Controls & Step Indicator -->
-            <div class="flex items-center gap-3">
-                <div id="guide-info" class="text-xs font-bold text-amber-300 bg-amber-950/40 px-3 py-1 rounded-full border border-amber-500/30 min-w-[150px] text-center">
-                    曲を選んで練習しよう
-                </div>
-                <button id="btn-prev-step" onclick="prevSongStep()" disabled class="bg-slate-700 disabled:opacity-40 text-white px-2.5 py-1 rounded-lg text-xs font-bold border border-slate-600">
-                    <i class="fa-solid fa-backward"></i> 前へ
-                </button>
-                <button id="btn-next-step" onclick="nextSongStep()" disabled class="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-900 px-3 py-1 rounded-lg text-xs font-black shadow">
-                    次へ <i class="fa-solid fa-forward"></i>
-                </button>
-                <button id="btn-auto-play" onclick="toggleAutoPlay()" disabled class="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-3 py-1 rounded-lg text-xs font-bold shadow flex items-center gap-1">
-                    <i id="icon-auto-play" class="fa-solid fa-play"></i> 自動お手本
-                </button>
-            </div>
-        </div>
-    </section>
 
     <!-- MAIN INSTRUMENT VISUAL CONTAINER -->
     <main class="flex-1 flex flex-col items-center justify-end p-0 overflow-hidden relative">
@@ -298,16 +289,39 @@
         class MelodicaAudioEngine {
             constructor() {
                 this.ctx = null;
-                this.activeNotes = new Map(); // midi -> { osc1, osc2, gain, filter }
+                this.activeNotes = new Map();
+                this.masterGain = null;
+                this.compressor = null;
             }
 
             init() {
                 if (!this.ctx) {
                     const AudioContext = window.AudioContext || window.webkitAudioContext;
                     this.ctx = new AudioContext();
+
+                    // 複数音（和音）同時発音時の音割れ・消音を防ぐマスターコンプレッサー
+                    this.masterGain = this.ctx.createGain();
+                    const initGain = typeof currentGainValue !== 'undefined' ? currentGainValue : 0.6;
+                    this.masterGain.gain.setValueAtTime(initGain, this.ctx.currentTime);
+
+                    this.compressor = this.ctx.createDynamicsCompressor();
+                    this.compressor.threshold.setValueAtTime(-12, this.ctx.currentTime);
+                    this.compressor.knee.setValueAtTime(30, this.ctx.currentTime);
+                    this.compressor.ratio.setValueAtTime(12, this.ctx.currentTime);
+                    this.compressor.attack.setValueAtTime(0.003, this.ctx.currentTime);
+                    this.compressor.release.setValueAtTime(0.25, this.ctx.currentTime);
+
+                    this.masterGain.connect(this.compressor);
+                    this.compressor.connect(this.ctx.destination);
                 }
                 if (this.ctx.state === 'suspended') {
                     this.ctx.resume();
+                }
+            }
+
+            setMasterVolume(val) {
+                if (this.masterGain && this.ctx) {
+                    this.masterGain.gain.setValueAtTime(val, this.ctx.currentTime);
                 }
             }
 
@@ -322,7 +336,6 @@
                 const freq = this.midiToFreq(midi);
                 const now = this.ctx.currentTime;
 
-                // Reed timbre synthesis: saw + square wave detune
                 const osc1 = this.ctx.createOscillator();
                 osc1.type = 'sawtooth';
                 osc1.frequency.setValueAtTime(freq, now);
@@ -338,12 +351,12 @@
 
                 const gain = this.ctx.createGain();
                 gain.gain.setValueAtTime(0.001, now);
-                gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
+                gain.gain.linearRampToValueAtTime(0.25, now + 0.02);
 
                 osc1.connect(filter);
                 osc2.connect(filter);
                 filter.connect(gain);
-                gain.connect(this.ctx.destination);
+                gain.connect(this.masterGain || this.ctx.destination);
 
                 osc1.start(now);
                 osc2.start(now);
@@ -358,8 +371,9 @@
                 const now = this.ctx.currentTime;
 
                 note.gain.gain.cancelScheduledValues(now);
-                note.gain.gain.setValueAtTime(note.gain.gain.value, now);
-                note.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.04);
+                const currentGain = Math.max(0.001, note.gain.gain.value);
+                note.gain.gain.setValueAtTime(currentGain, now);
+                note.gain.gain.linearRampToValueAtTime(0.0001, now + 0.05);
 
                 setTimeout(() => {
                     try {
@@ -369,7 +383,7 @@
                         note.osc2.disconnect();
                         note.gain.disconnect();
                     } catch (e) {}
-                }, 50);
+                }, 60);
 
                 this.activeNotes.delete(midi);
             }
@@ -377,7 +391,7 @@
 
         const audioEngine = new MelodicaAudioEngine();
 
-        // 最初の画面タップ/操作イベントのキャプチャ段階で音声エンジンを即時起動（1回目から鳴るように修正）
+        // 最初の画面タップ/操作イベントのキャプチャ段階で音声エンジンを即時起動
         const unlockAudioContext = () => {
             audioEngine.init();
         };
@@ -385,6 +399,25 @@
         window.addEventListener('touchstart', unlockAudioContext, { capture: true });
         window.addEventListener('mousedown', unlockAudioContext, { capture: true });
         window.addEventListener('keydown', unlockAudioContext, { capture: true });
+
+        // 全画面での長押しコンテキストメニュー表示を完全に防ぐ
+        window.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            return false;
+        }, { passive: false });
+
+        // ダブルタップによるズーム・範囲選択・メニュー表示を防止
+        let lastTouchEnd = 0;
+        window.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                // テキスト入力欄以外でのダブルタップ標準動作をキャンセル
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                }
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
 
         /* -------------------------------------------------------------
            CONSTANTS & DATA STRUCTURES
@@ -427,58 +460,99 @@
         const SONGS = {
             kaeru: {
                 title: "かえるの合唱",
-                notes: [60, 62, 64, 65, 64, 62, 60, 64, 65, 67, 69, 67, 65, 64, 60, 60, 60, 60, 60, 60, 60, 60, 62, 62, 64, 64, 65, 64, 62, 60]
+                bpm: 120,
+                notes: [
+                    { midi: 60, duration: 1 }, { midi: 62, duration: 1 }, { midi: 64, duration: 1 }, { midi: 65, duration: 1 },
+                    { midi: 64, duration: 1 }, { midi: 62, duration: 1 }, { midi: 60, duration: 2 },
+                    { midi: 64, duration: 1 }, { midi: 65, duration: 1 }, { midi: 67, duration: 1 }, { midi: 69, duration: 1 },
+                    { midi: 67, duration: 1 }, { midi: 65, duration: 1 }, { midi: 64, duration: 2 }
+                ]
             },
             tulip: {
                 title: "チューリップ",
-                notes: [60, 62, 64, 60, 62, 64, 67, 64, 62, 60, 62, 64, 62]
+                bpm: 120,
+                notes: [
+                    { midi: 60, duration: 1 }, { midi: 62, duration: 1 }, { midi: 64, duration: 2 },
+                    { midi: 60, duration: 1 }, { midi: 62, duration: 1 }, { midi: 64, duration: 2 },
+                    { midi: 67, duration: 1 }, { midi: 64, duration: 1 }, { midi: 62, duration: 1 }, { midi: 60, duration: 1 },
+                    { midi: 62, duration: 1 }, { midi: 64, duration: 1 }, { midi: 62, duration: 2 }
+                ]
             },
             twinkle: {
                 title: "きらきら星",
-                notes: [60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60]
+                bpm: 100,
+                notes: [
+                    { midi: 60, duration: 1 }, { midi: 60, duration: 1 }, { midi: 67, duration: 1 }, { midi: 67, duration: 1 },
+                    { midi: 69, duration: 1 }, { midi: 69, duration: 1 }, { midi: 67, duration: 2 },
+                    { midi: 65, duration: 1 }, { midi: 65, duration: 1 }, { midi: 64, duration: 1 }, { midi: 64, duration: 1 },
+                    { midi: 62, duration: 1 }, { midi: 62, duration: 1 }, { midi: 60, duration: 2 }
+                ]
             },
             joy: {
                 title: "かんきのおうた",
-                notes: [64, 64, 65, 67, 67, 65, 64, 62, 60, 60, 62, 64, 64, 62, 62]
+                bpm: 120,
+                notes: [
+                    { midi: 64, duration: 1 }, { midi: 64, duration: 1 }, { midi: 65, duration: 1 }, { midi: 67, duration: 1 },
+                    { midi: 67, duration: 1 }, { midi: 65, duration: 1 }, { midi: 64, duration: 1 }, { midi: 62, duration: 1 },
+                    { midi: 60, duration: 1 }, { midi: 60, duration: 1 }, { midi: 62, duration: 1 }, { midi: 64, duration: 1 },
+                    { midi: 64, duration: 1.5 }, { midi: 62, duration: 0.5 }, { midi: 62, duration: 2 }
+                ]
             },
             doremi: {
                 title: "ドレミのうた",
-                notes: [60, 62, 64, 60, 64, 60, 64, 62, 64, 65, 65, 64, 62, 65]
+                bpm: 130,
+                notes: [
+                    { midi: 60, duration: 1.5 }, { midi: 62, duration: 0.5 }, { midi: 64, duration: 1 }, { midi: 60, duration: 1 },
+                    { midi: 64, duration: 1 }, { midi: 60, duration: 1 }, { midi: 64, duration: 2 }
+                ]
             },
             mary: {
                 title: "メリーさんのひつじ",
-                notes: [64, 62, 60, 62, 64, 64, 64, 62, 62, 62, 64, 67, 67, 64, 62, 60, 62, 64, 64, 64, 64, 62, 62, 64, 62, 60]
+                bpm: 110,
+                notes: [
+                    { midi: 64, duration: 1 }, { midi: 62, duration: 1 }, { midi: 60, duration: 1 }, { midi: 62, duration: 1 },
+                    { midi: 64, duration: 1 }, { midi: 64, duration: 1 }, { midi: 64, duration: 2 },
+                    { midi: 62, duration: 1 }, { midi: 62, duration: 1 }, { midi: 62, duration: 2 },
+                    { midi: 64, duration: 1 }, { midi: 67, duration: 1 }, { midi: 67, duration: 2 }
+                ]
             },
             yamano: {
                 title: "やまの おんがくか",
-                notes: [60, 62, 64, 65, 67, 67, 67, 69, 67, 65, 64, 62, 60, 64, 67, 60, 64, 67]
+                bpm: 120,
+                notes: [
+                    { midi: 60, duration: 1 }, { midi: 62, duration: 1 }, { midi: 64, duration: 1 }, { midi: 65, duration: 1 },
+                    { midi: 67, duration: 1 }, { midi: 67, duration: 1 }, { midi: 67, duration: 2 },
+                    { midi: 69, duration: 1 }, { midi: 67, duration: 1 }, { midi: 65, duration: 1 }, { midi: 64, duration: 1 }, { midi: 62, duration: 2 }
+                ]
             }
         };
 
-        const PC_KEY_MAP = {
-            'z': 53, 's': 54, 'x': 55, 'd': 56, 'c': 57, 'f': 58, 'v': 59,
-            'b': 60, 'h': 61, 'n': 62, 'j': 63, 'm': 64, ',': 65, 'l': 66,
-            '.': 67, ';': 68, '/': 69,
-            'q': 70, '2': 71, 'w': 72, '3': 73, 'e': 74, '4': 75, 'r': 76,
-            't': 77, '6': 78, 'y': 79, '7': 80, 'u': 81, '8': 82, 'i': 83, 'o': 84
+        const NOTE_NAME_TO_MIDI = {
+            'ド': 60, 'ド#': 61, 'レ': 62, 'レ#': 63, 'ミ': 64, 'ファ': 65, 'ファ#': 66, 'ソ': 67, 'ソ#': 68, 'ラ': 69, 'ラ#': 70, 'シ': 71,
+            '高いド': 72, 'ド5': 72, '高いド#': 73, '高いレ': 74, 'レ5': 74, '高いレ#': 75, '高いミ': 76, 'ミ5': 76, '高いファ': 77, 'ファ5': 77,
+            '低いファ': 53, 'ファ3': 53, '低いソ': 55, 'ソ3': 55, '低いラ': 57, 'ラ3': 57, '低いシ': 59, 'シ3': 59,
+            '休': 0, '休符': 0, '-': 0, 'REST': 0, 'C4': 60, 'C#4': 61, 'D4': 62, 'D#4': 63, 'E4': 64, 'F4': 65, 'F#4': 66, 'G4': 67, 'G#4': 68, 'A4': 69, 'A#4': 70, 'B4': 71, 'C5': 72
         };
 
         let labelMode = 'none';
         let isRealMmScale = true; // デフォルトで実物大モード
-        let isScrollLocked = true; // デフォルトでスクロールロック状態 (初期位置固定)
-        let currentSong = null;
-        let songStep = 0;
-        let autoPlayTimer = null;
+        let isScrollLocked = true; // デフォルトでスクロールロック状態
+        let currentVolLevel = 3; // 初期音量レベル (0〜5)
+        let lastVolLevel = 3; // 消音解除時の復元用
+        let currentGainValue = 0.6; // 3/5 = 0.6
 
+        let activeTouchMidis = new Set();
         const activePointerMidis = new Map();
-        const pcPressedMidis = new Set();
         const activePressedMidis = new Set();
 
         /* -------------------------------------------------------------
            TOUCH / POINTER STATE SYNC
            ------------------------------------------------------------- */
         function syncKeyStates() {
-            const targetMidis = new Set([...activePointerMidis.values(), ...pcPressedMidis]);
+            const targetMidis = new Set([
+                ...activeTouchMidis,
+                ...activePointerMidis.values()
+            ]);
 
             for (const midi of Array.from(activePressedMidis)) {
                 if (!targetMidis.has(midi)) {
@@ -494,8 +568,8 @@
         }
 
         function stopAllNotes() {
+            activeTouchMidis.clear();
             activePointerMidis.clear();
-            pcPressedMidis.clear();
             syncKeyStates();
         }
 
@@ -512,27 +586,26 @@
             const totalWhiteKeys = whiteKeys.length; // 19
 
             if (isRealMmScale) {
-                // Chromebook画面上で実寸19mmになるようスケール調整 (ロック状態に応じてoverflow制御)
                 wrapper.className = `w-full relative ${isScrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'} flex items-end pb-1`;
                 container.style.width = `${19 * 26.6}mm`;
                 container.style.height = `118mm`;
                 
                 const whiteKeyWidthMm = 26.6;  // 実測約19mm表示
                 const whiteKeyHeightMm = 113.0; // 白鍵長さ
-                const blackKeyWidthMm = 13.9;   // 黒鍵幅（実測約10mm表示）
+                const blackKeyWidthMm = 13.9;   // 黒鍵幅
                 const blackKeyHeightMm = 66.7;  // 黒鍵長さ
 
                 whiteKeys.forEach(key => {
                     const keyEl = document.createElement('div');
                     keyEl.id = `key-${key.midi}`;
                     keyEl.dataset.midi = key.midi;
-                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2 cursor-pointer select-none';
+                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-3 cursor-pointer select-none';
                     keyEl.style.width = `${whiteKeyWidthMm - 0.4}mm`;
                     keyEl.style.height = `${whiteKeyHeightMm}mm`;
                     keyEl.style.left = `${key.whitePos * whiteKeyWidthMm + 0.2}mm`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-[11px] font-black text-slate-700 pointer-events-none select-none';
+                    label.className = 'key-label text-2xl md:text-3xl font-black text-slate-900 pointer-events-none select-none tracking-tighter leading-none drop-shadow-sm';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -543,14 +616,14 @@
                     const keyEl = document.createElement('div');
                     keyEl.id = `key-${key.midi}`;
                     keyEl.dataset.midi = key.midi;
-                    keyEl.className = 'black-key absolute flex flex-col justify-end items-center pb-1.5 cursor-pointer select-none top-0';
+                    keyEl.className = 'black-key absolute flex flex-col justify-end items-center pb-2 cursor-pointer select-none top-0';
                     keyEl.style.width = `${blackKeyWidthMm}mm`;
                     keyEl.style.height = `${blackKeyHeightMm}mm`;
                     const leftMm = (key.whitePos + 1) * whiteKeyWidthMm - (blackKeyWidthMm / 2);
                     keyEl.style.left = `${leftMm}mm`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-[9px] font-bold text-slate-200 pointer-events-none select-none';
+                    label.className = 'key-label text-sm md:text-base font-black text-slate-100 pointer-events-none select-none tracking-tighter leading-none';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -566,7 +639,6 @@
                 });
 
             } else {
-                // Screen-Fit Mode with EXACT Real Melodica Physical Aspect Ratio (1 : 4.25)
                 wrapper.className = 'w-full relative overflow-hidden flex flex-col justify-end';
                 container.style.width = '100%';
 
@@ -583,13 +655,13 @@
                     const keyEl = document.createElement('div');
                     keyEl.id = `key-${key.midi}`;
                     keyEl.dataset.midi = key.midi;
-                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2 cursor-pointer select-none';
+                    keyEl.className = 'white-key absolute bottom-0 flex flex-col justify-end items-center pb-2.5 cursor-pointer select-none';
                     keyEl.style.width = `${singleWhiteWidth - 2}px`;
                     keyEl.style.height = `${whiteKeyHeight}px`;
                     keyEl.style.left = `${key.whitePos * singleWhiteWidth + 1}px`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-[11px] md:text-xs font-black text-slate-700 pointer-events-none select-none';
+                    label.className = 'key-label text-xl md:text-2xl font-black text-slate-900 pointer-events-none select-none tracking-tighter leading-none drop-shadow-sm';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -607,7 +679,7 @@
                     keyEl.style.left = `${leftPx}px`;
 
                     const label = document.createElement('span');
-                    label.className = 'key-label text-[9px] md:text-[10px] font-bold text-slate-200 pointer-events-none select-none';
+                    label.className = 'key-label text-xs md:text-sm font-black text-slate-100 pointer-events-none select-none tracking-tighter leading-none';
                     label.innerText = getLabelText(key);
                     keyEl.appendChild(label);
 
@@ -663,12 +735,99 @@
         }
 
         function setupPointerListeners(container) {
+            const wrapper = document.getElementById('keyboard-wrapper') || container;
+
+            // タッチ識別子(Touch ID)ごとの押下音階管理マップ
+            const touchIdToMidiMap = new Map();
+
+            // マルチタッチ（複数指同時押し・長押し完全対応＆白鍵左右1mm誤タップ防止ゾーン）
+            const handleTouch = (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                
+                if (e.cancelable) {
+                    const isKeybed = e.target.closest('#keyboard-container') || e.target.closest('#keyboard-wrapper') || e.target.closest('.pianica-body');
+                    if (isKeybed || e.touches.length > 1) {
+                        e.preventDefault();
+                    }
+                }
+                audioEngine.init();
+
+                const activeTouchIds = new Set();
+                const touchMidis = new Set();
+
+                for (let i = 0; i < e.touches.length; i++) {
+                    const touch = e.touches[i];
+                    activeTouchIds.add(touch.identifier);
+
+                    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const keyEl = el ? el.closest('[data-midi]') : null;
+
+                    if (keyEl) {
+                        const midi = parseInt(keyEl.dataset.midi, 10);
+                        const isWhiteKey = keyEl.classList.contains('white-key');
+
+                        if (isWhiteKey) {
+                            const rect = keyEl.getBoundingClientRect();
+                            // 白鍵の左右1mm相当の不感帯（デッドゾーン）を計算 (26.6mm中1mm)
+                            const deadZonePx = rect.width * (1.0 / 26.6);
+                            const relX = touch.clientX - rect.left;
+
+                            // 左右1mmの内側の時のみ有効に発音（隣の白鍵誤判定を防ぐ）
+                            if (relX >= deadZonePx && relX <= (rect.width - deadZonePx)) {
+                                touchIdToMidiMap.set(touch.identifier, midi);
+                                touchMidis.add(midi);
+                            } else if (touchIdToMidiMap.has(touch.identifier)) {
+                                // 既に押下中の音階を維持
+                                touchMidis.add(touchIdToMidiMap.get(touch.identifier));
+                            }
+                        } else {
+                            // 黒鍵は通常の判定
+                            touchIdToMidiMap.set(touch.identifier, midi);
+                            touchMidis.add(midi);
+                        }
+                    } else if (touchIdToMidiMap.has(touch.identifier)) {
+                        // 長押し中に指先がミリ単位でずれたり隙間に接触しても音を維持
+                        touchMidis.add(touchIdToMidiMap.get(touch.identifier));
+                    }
+                }
+
+                // 離された指のタッチIDを解除
+                for (const [id] of touchIdToMidiMap) {
+                    if (!activeTouchIds.has(id)) {
+                        touchIdToMidiMap.delete(id);
+                    }
+                }
+
+                activeTouchMidis = touchMidis;
+                syncKeyStates();
+            };
+
+            window.addEventListener('touchstart', handleTouch, { passive: false });
+            window.addEventListener('touchmove', handleTouch, { passive: false });
+            window.addEventListener('touchend', handleTouch, { passive: false });
+            window.addEventListener('touchcancel', handleTouch, { passive: false });
+
+            // ポインターイベント（マウス / ペン用）
             const updatePointerFromEvent = (e) => {
+                if (e.pointerType === 'touch') return; // タッチは専用ハンドラーで一括処理
                 const el = document.elementFromPoint(e.clientX, e.clientY);
                 const keyEl = el ? el.closest('[data-midi]') : null;
                 if (keyEl) {
                     const midi = parseInt(keyEl.dataset.midi, 10);
-                    activePointerMidis.set(e.pointerId, midi);
+                    const isWhiteKey = keyEl.classList.contains('white-key');
+
+                    if (isWhiteKey) {
+                        const rect = keyEl.getBoundingClientRect();
+                        const deadZonePx = rect.width * (1.0 / 26.6);
+                        const relX = e.clientX - rect.left;
+                        if (relX >= deadZonePx && relX <= (rect.width - deadZonePx)) {
+                            activePointerMidis.set(e.pointerId, midi);
+                        } else {
+                            activePointerMidis.delete(e.pointerId);
+                        }
+                    } else {
+                        activePointerMidis.set(e.pointerId, midi);
+                    }
                 } else {
                     activePointerMidis.delete(e.pointerId);
                 }
@@ -676,13 +835,15 @@
             };
 
             container.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'touch') return;
                 e.preventDefault();
                 audioEngine.init();
                 updatePointerFromEvent(e);
             });
 
             window.addEventListener('pointermove', (e) => {
-                if (e.buttons > 0 || e.pointerType === 'touch') {
+                if (e.pointerType === 'touch') return;
+                if (e.buttons > 0) {
                     updatePointerFromEvent(e);
                 }
             });
@@ -697,7 +858,11 @@
             window.addEventListener('pointerup', clearPointer);
             window.addEventListener('pointercancel', clearPointer);
             window.addEventListener('pointerleave', clearPointer);
-            window.addEventListener('blur', stopAllNotes);
+            
+            // タブ非表示時（ページ離脱時）のみ音を完全停止
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) stopAllNotes();
+            });
         }
 
         function getLabelText(key) {
@@ -717,7 +882,6 @@
 
             audioEngine.startNote(midi);
             createNoteParticle(midi);
-            checkLessonProgress(midi);
         }
 
         function releaseKey(midi) {
@@ -754,7 +918,6 @@
             document.getElementById('btn-label-doremi').className = mode === 'doremi' ? 'px-2 py-1 rounded font-bold bg-sky-500 text-white shadow' : 'px-2 py-1 rounded font-bold hover:bg-slate-600 text-slate-300';
 
             renderKeyboard();
-            highlightCurrentSongGuide();
         }
 
         function setBodyColor(color) {
@@ -768,166 +931,71 @@
         }
 
         /* -------------------------------------------------------------
-           LESSON & SONG GUIDE SYSTEM
+           VOLUME CONTROLS (0-5 STAGES & MUTE TOGGLE)
            ------------------------------------------------------------- */
-        function loadSelectedSong() {
-            const songKey = document.getElementById('song-select').value;
-            if (!songKey || !SONGS[songKey]) {
-                currentSong = null;
-                songStep = 0;
-                document.getElementById('guide-info').innerText = '曲を選んで練習しよう';
-                document.getElementById('btn-prev-step').disabled = true;
-                document.getElementById('btn-next-step').disabled = true;
-                document.getElementById('btn-auto-play').disabled = true;
-                clearGuideHighlights();
-                return;
+        function setVolumeLevel(val) {
+            const level = parseInt(val, 10);
+            currentVolLevel = level;
+
+            if (level > 0) {
+                lastVolLevel = level;
             }
 
-            currentSong = SONGS[songKey];
-            songStep = 0;
-            document.getElementById('btn-prev-step').disabled = false;
-            document.getElementById('btn-next-step').disabled = false;
-            document.getElementById('btn-auto-play').disabled = false;
+            currentGainValue = level / 5;
+            audioEngine.setMasterVolume(currentGainValue);
 
-            updateSongGuideUI();
-        }
+            // スライダーの位置を同期
+            const slider = document.getElementById('volume-slider');
+            if (slider) slider.value = level;
 
-        function updateSongGuideUI() {
-            if (!currentSong) return;
-
-            const currentMidi = currentSong.notes[songStep];
-            const keyConfig = KEYS_CONFIG.find(k => k.midi === currentMidi);
-            
-            const songTitle = currentSong.title;
-            const noteText = keyConfig ? keyConfig.doremi : '';
-            const progress = `(${songStep + 1} / ${currentSong.notes.length})`;
-
-            document.getElementById('guide-info').innerText = `${songTitle}: つぎは「 ${noteText} 」 ${progress}`;
-
-            highlightCurrentSongGuide();
-        }
-
-        function highlightCurrentSongGuide() {
-            clearGuideHighlights();
-            if (!currentSong) return;
-
-            const targetMidi = currentSong.notes[songStep];
-            const targetKey = document.getElementById(`key-${targetMidi}`);
-            if (targetKey) {
-                targetKey.classList.add('guide-active');
-                targetKey.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
-        }
-
-        function clearGuideHighlights() {
-            document.querySelectorAll('.guide-active').forEach(el => el.classList.remove('guide-active'));
-        }
-
-        function checkLessonProgress(pressedMidi) {
-            if (!currentSong) return;
-
-            const expectedMidi = currentSong.notes[songStep];
-            if (pressedMidi === expectedMidi) {
-                if (songStep < currentSong.notes.length - 1) {
-                    songStep++;
-                    updateSongGuideUI();
+            // 0〜5数字ボタンのハイライト表示切り替え
+            const stepBtns = document.querySelectorAll('.vol-step-btn');
+            stepBtns.forEach(btn => {
+                const btnVol = parseInt(btn.dataset.vol, 10);
+                if (btnVol === level) {
+                    btn.className = 'vol-step-btn font-black text-amber-400 scale-110 transition-all cursor-pointer';
                 } else {
-                    document.getElementById('guide-info').innerText = `🎉 祝！ ${currentSong.title} 演奏完了！`;
-                    clearGuideHighlights();
+                    btn.className = 'vol-step-btn font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer';
+                }
+            });
+
+            // 消音ボタンの見た目・アイコン切り替え
+            const muteBtn = document.getElementById('btn-mute');
+            const muteIcon = document.getElementById('mute-icon');
+            if (muteBtn && muteIcon) {
+                if (level === 0) {
+                    muteBtn.className = 'w-8 h-8 rounded-lg font-bold bg-rose-600 hover:bg-rose-500 text-white transition-all flex items-center justify-center border border-rose-400 shadow-sm active:scale-95';
+                    muteIcon.className = 'fa-solid fa-volume-xmark text-white text-base';
+                } else {
+                    muteBtn.className = 'w-8 h-8 rounded-lg font-bold bg-slate-600 hover:bg-slate-500 text-slate-200 transition-all flex items-center justify-center border border-slate-500 shadow-sm active:scale-95';
+                    muteIcon.className = level < 3 
+                        ? 'fa-solid fa-volume-low text-amber-400 text-base'
+                        : 'fa-solid fa-volume-high text-amber-400 text-base';
                 }
             }
         }
 
-        function nextSongStep() {
-            if (!currentSong) return;
-            if (songStep < currentSong.notes.length - 1) {
-                songStep++;
-                updateSongGuideUI();
+        function toggleMute() {
+            if (currentVolLevel > 0) {
+                lastVolLevel = currentVolLevel;
+                setVolumeLevel(0);
+            } else {
+                setVolumeLevel(lastVolLevel > 0 ? lastVolLevel : 3);
             }
         }
-
-        function prevSongStep() {
-            if (!currentSong) return;
-            if (songStep > 0) {
-                songStep--;
-                updateSongGuideUI();
-            }
-        }
-
-        function toggleAutoPlay() {
-            if (autoPlayTimer) {
-                clearInterval(autoPlayTimer);
-                autoPlayTimer = null;
-                document.getElementById('icon-auto-play').className = 'fa-solid fa-play';
-                return;
-            }
-
-            if (!currentSong) return;
-            songStep = 0;
-            document.getElementById('icon-auto-play').className = 'fa-solid fa-stop';
-
-            autoPlayTimer = setInterval(() => {
-                if (songStep >= currentSong.notes.length) {
-                    clearInterval(autoPlayTimer);
-                    autoPlayTimer = null;
-                    document.getElementById('icon-auto-play').className = 'fa-solid fa-play';
-                    return;
-                }
-
-                const midi = currentSong.notes[songStep];
-                pressKey(midi);
-                setTimeout(() => releaseKey(midi), 300);
-
-                songStep++;
-                if (songStep < currentSong.notes.length) {
-                    updateSongGuideUI();
-                }
-            }, 550);
-        }
-
-        /* -------------------------------------------------------------
-           PC KEYBOARD SHORTCUT EVENT LISTENERS & INITIALIZATION
-           ------------------------------------------------------------- */
-        window.addEventListener('keydown', (e) => {
-            if (e.repeat) return;
-            const key = e.key.toLowerCase();
-            if (PC_KEY_MAP[key]) {
-                pcPressedMidis.add(PC_KEY_MAP[key]);
-                syncKeyStates();
-            }
-        });
-
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            if (PC_KEY_MAP[key]) {
-                pcPressedMidis.delete(PC_KEY_MAP[key]);
-                syncKeyStates();
-            }
-        });
 
         window.addEventListener('resize', () => {
             renderKeyboard();
         });
 
-        window.onload = () => {
+        /* -------------------------------------------------------------
+           INITIALIZATION ON WINDOW LOAD
+           ------------------------------------------------------------- */
+        window.addEventListener('DOMContentLoaded', () => {
             renderKeyboard();
             updateScrollLockUI();
-
-            // Prevent Context Menu, Text Selection, Dragging, and Double-Tap Zoom globally
-            document.addEventListener('contextmenu', (e) => e.preventDefault(), false);
-            document.addEventListener('selectstart', (e) => e.preventDefault(), false);
-            document.addEventListener('dragstart', (e) => e.preventDefault(), false);
-            document.addEventListener('dblclick', (e) => e.preventDefault(), false);
-
-            let lastTouchEnd = 0;
-            document.addEventListener('touchend', (e) => {
-                const now = Date.now();
-                if (now - lastTouchEnd <= 300) {
-                    e.preventDefault();
-                }
-                lastTouchEnd = now;
-            }, { passive: false });
-        };
+            setVolumeLevel(3); // 初期音量レベル3を適用
+        });
     </script>
 </body>
 </html>

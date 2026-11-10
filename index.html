@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
-    <title>鍵盤ハーモニカ (32鍵)</title>
-    <meta property="og:title" content="鍵盤ハーモニカ(32鍵)">
-    <meta property="og:description" content="【音楽】鍵盤ハーモニカの学習アプリです。">
-    <meta property="og:type" content="website">
+    <title>3D リアル鍵盤ハーモニカ (32鍵)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -540,6 +537,7 @@
         let labelMode = 'none';
         let isRealMmScale = true; // デフォルトで実物大モード
         let isScrollLocked = true; // デフォルトでスクロールロック状態
+        let isInitialRender = true; // 初回レンダリング判定用
         let currentVolLevel = 3; // 初期音量レベル (0〜5)
         let lastVolLevel = 3; // 消音解除時の復元用
         let currentGainValue = 0.6; // 3/5 = 0.6
@@ -583,6 +581,9 @@
             const container = document.getElementById('keyboard-container');
             const wrapper = document.getElementById('keyboard-wrapper');
             if (!container || !wrapper) return;
+
+            // 再レンダリング前のスクロール位置を記憶
+            const prevScrollLeft = wrapper.scrollLeft;
             container.innerHTML = '';
 
             const whiteKeys = KEYS_CONFIG.filter(k => !k.isBlack);
@@ -633,17 +634,23 @@
                     container.appendChild(keyEl);
                 });
 
-                // 初期スクロール位置を白鍵2つ分左へ移動
+                // アプリ初回起動時のみ初期位置(A3)へ移動し、それ以降は現在のスライド位置を保持
                 requestAnimationFrame(() => {
-                    const key2El = document.getElementById('key-57'); // whitePos 2 (A3)
-                    if (key2El) {
-                        wrapper.scrollLeft = key2El.offsetLeft;
+                    if (isInitialRender) {
+                        const key2El = document.getElementById('key-57'); // whitePos 2 (A3)
+                        if (key2El) {
+                            wrapper.scrollLeft = key2El.offsetLeft;
+                        }
+                        isInitialRender = false;
+                    } else {
+                        wrapper.scrollLeft = prevScrollLeft;
                     }
                 });
 
             } else {
-                wrapper.className = 'w-full relative overflow-hidden flex flex-col justify-end';
-                container.style.width = '100%';
+                wrapper.className = `w-full relative ${isScrollLocked ? 'overflow-x-hidden' : 'overflow-x-auto'} flex flex-col justify-end`;
+                // スライドした表示位置をロック時も保つため幅を135%に固定
+                container.style.width = '135%';
 
                 const containerWidth = container.clientWidth || wrapper.clientWidth || 800;
                 const singleWhiteWidth = containerWidth / totalWhiteKeys;
@@ -688,6 +695,10 @@
 
                     container.appendChild(keyEl);
                 });
+
+                requestAnimationFrame(() => {
+                    wrapper.scrollLeft = prevScrollLeft;
+                });
             }
 
             setupPointerListeners(container);
@@ -696,12 +707,32 @@
         /* -------------------------------------------------------------
            SCROLL LOCK TOGGLE CONTROLS
            ------------------------------------------------------------- */
+        function updateScrollLockUI() {
+            const btn = document.getElementById('btn-scroll-lock');
+            const icon = document.getElementById('icon-scroll-lock');
+            const text = document.getElementById('text-scroll-lock');
+            
+            if (!btn || !icon || !text) return;
+            
+            if (isScrollLocked) {
+                btn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs px-3 py-1 rounded-full border border-amber-300 shadow flex items-center gap-1.5 transition-all cursor-pointer';
+                icon.className = 'fa-solid fa-lock';
+                text.innerText = '位置ロック中';
+            } else {
+                btn.className = 'bg-slate-700 hover:bg-slate-600 text-emerald-400 font-bold text-xs px-3 py-1 rounded-full border border-emerald-500 shadow flex items-center gap-1.5 transition-all cursor-pointer';
+                icon.className = 'fa-solid fa-lock-open';
+                text.innerText = '移動OK';
+            }
+        }
+
         function toggleScrollLock() {
+            const wrapper = document.getElementById('keyboard-wrapper');
+            const currentScroll = wrapper ? wrapper.scrollLeft : 0;
+
             isScrollLocked = !isScrollLocked;
             updateScrollLockUI();
 
-            const wrapper = document.getElementById('keyboard-wrapper');
-            if (wrapper && isRealMmScale) {
+            if (wrapper) {
                 if (isScrollLocked) {
                     wrapper.classList.remove('overflow-x-auto');
                     wrapper.classList.add('overflow-x-hidden');
@@ -709,23 +740,8 @@
                     wrapper.classList.remove('overflow-x-hidden');
                     wrapper.classList.add('overflow-x-auto');
                 }
-            }
-        }
-
-        function updateScrollLockUI() {
-            const btn = document.getElementById('btn-scroll-lock');
-            const icon = document.getElementById('icon-scroll-lock');
-            const text = document.getElementById('text-scroll-lock');
-            if (!btn || !icon || !text) return;
-
-            if (isScrollLocked) {
-                btn.className = 'bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-xs px-3 py-1 rounded-full border border-amber-300 shadow flex items-center gap-1.5 transition-all cursor-pointer';
-                icon.className = 'fa-solid fa-lock';
-                text.innerText = '位置ロック中';
-            } else {
-                btn.className = 'bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs px-3 py-1 rounded-full border border-amber-400/60 shadow flex items-center gap-1.5 transition-all cursor-pointer animate-pulse';
-                icon.className = 'fa-solid fa-lock-open';
-                text.innerText = '移動OK (ロック解除)';
+                // 移動させた現在のスクロール位置を維持してロック
+                wrapper.scrollLeft = currentScroll;
             }
         }
 
@@ -743,6 +759,15 @@
             // タッチ識別子(Touch ID)ごとの押下音階管理マップ
             const touchIdToMidiMap = new Map();
 
+            // 位置ロック解除時の指・マウスドラッグ移動制御用
+            let touchStartX = 0;
+            let touchStartScrollLeft = 0;
+            let isTouchSwiping = false;
+
+            let isMouseDragging = false;
+            let mouseStartX = 0;
+            let mouseStartScrollLeft = 0;
+
             // マルチタッチ（複数指同時押し・長押し完全対応＆白鍵左右1mm誤タップ防止ゾーン）
             const handleTouch = (e) => {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -754,6 +779,23 @@
                     }
                 }
                 audioEngine.init();
+
+                // 位置ロック解除時 (isScrollLocked === false) の指による左右スワイプ移動
+                if (!isScrollLocked) {
+                    if (e.type === 'touchstart' && e.touches.length === 1) {
+                        touchStartX = e.touches[0].clientX;
+                        touchStartScrollLeft = wrapper.scrollLeft;
+                        isTouchSwiping = true;
+                    } else if (e.type === 'touchmove' && isTouchSwiping && e.touches.length === 1) {
+                        const deltaX = e.touches[0].clientX - touchStartX;
+                        wrapper.scrollLeft = touchStartScrollLeft - deltaX;
+                    }
+                }
+                if (e.type === 'touchend' || e.type === 'touchcancel') {
+                    if (e.touches.length === 0) {
+                        isTouchSwiping = false;
+                    }
+                }
 
                 const activeTouchIds = new Set();
                 const touchMidis = new Set();
@@ -809,6 +851,26 @@
             window.addEventListener('touchmove', handleTouch, { passive: false });
             window.addEventListener('touchend', handleTouch, { passive: false });
             window.addEventListener('touchcancel', handleTouch, { passive: false });
+
+            // マウスドラッグによる鍵盤移動制御（ロック解除時）
+            container.addEventListener('mousedown', (e) => {
+                if (!isScrollLocked) {
+                    isMouseDragging = true;
+                    mouseStartX = e.clientX;
+                    mouseStartScrollLeft = wrapper.scrollLeft;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isScrollLocked && isMouseDragging) {
+                    const deltaX = e.clientX - mouseStartX;
+                    wrapper.scrollLeft = mouseStartScrollLeft - deltaX;
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                isMouseDragging = false;
+            });
 
             // ポインターイベント（マウス / ペン用）
             const updatePointerFromEvent = (e) => {
